@@ -7,7 +7,6 @@ void spam(void *warmup){
   Serial.println(seconds);
   for(;;){
     Serial.println("busy loop");
-    auto start_busy_loop = millis();
     for(auto start_busy_loop = millis(); millis() - start_busy_loop < 10000ul;);
     Serial.println("delay");
     delay(seconds * 1000ul);
