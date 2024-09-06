@@ -2,7 +2,28 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
+/*
+  Simple implementation of a command line interface over Serial.
+
+  The SerialCliTask implements a FreeRTOS task that reads from serial and
+  parses command in the form:
+    <command> [args...]
+  The list of commands is provided by the user as an array of CliCallback structures,
+  matching command strings to function pointers.
+
+  This CLI task runs with the highest priority available, in order to be able to work
+  even when other tasks hang for any reason.
+*/
+
 class CliCallback {
+
+  /*
+    A CliCallback struct contains the MurMur3 hash of the command string, and
+    the corresponding function pointer to call.
+
+    The constructors are all constexpr, so that the compiler can avoid emitting
+    the string for the command.
+  */
 
 public:
   using CliFunctionPointer = void (*)(const String &params);
@@ -34,15 +55,13 @@ public:
   }
 
 private:
-  friend void SerialCliLoop(typeof(Serial) &serial, const CliCallback *callbacks);
-
   const uint32_t cliCommandHash;
   const CliFunctionPointer function;
+
   constexpr static uint32_t murmur3_32_dwordFromStr(const char *&str, uint32_t &dword) {
     dword = 0;
     for (int i = 0; i < 4; i++) {
-      if (!str[i])
-        return false;
+      if (!str[i]) return false;
       dword |= *str++ << i * 8;
     }
     return true;
@@ -54,6 +73,8 @@ private:
     dword *= 0x1b873593;
     return dword;
   }
+
+  friend void SerialCliLoop(typeof(Serial) &serial, const CliCallback *callbacks);
 };
 
 template <size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class SerialCliTask {
@@ -65,8 +86,7 @@ public:
 
   /*
     Setup the task.
-    Argument is an array of CliCallback structures, terminated by
-    one dummy entry (callback.func == nullptr).
+    Argument is an array of CliCallback structures, terminated by one dummy entry (callback.func == nullptr).
   */
   TaskHandle_t create(const CliCallback *callbacks) {
     Serial.begin(9600);
@@ -74,8 +94,7 @@ public:
     serial.setTimeout(0);
     this->callbacks = callbacks;
     TaskHandle_t handle = task.create(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1);
-    if (!handle)
-      serial.print(F("Failed to create serial CLI task!"));
+    if (!handle) serial.print(F("Failed to create serial CLI task!\n"));
     return handle;
   }
 

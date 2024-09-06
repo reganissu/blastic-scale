@@ -1,6 +1,10 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
+/*
+  Utility class to allocate static buffers for FreeRTOS tasks.
+*/
+
 template <size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class StaticTask {
 
 public:
