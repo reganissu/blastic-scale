@@ -1,17 +1,23 @@
-#include "SerialCliTask.h"
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
+#include "SerialCliTask.h"
 
 void loop() {}
 
-static void cliPing(const String &params) { Serial.print(F("pong\n")); }
+namespace cli {
 
-static constexpr const CliCallback cliCallbacks[]{CliCallback("ping", cliPing), CliCallback()};
+static void ping(const String &params) {
+  auto p = MutexedPrint<Serial>();
+  p.print(F("pong, args: "));
+  p.println(params);
+}
 
-SerialCliTask cliTask(Serial, cliCallbacks);
+static constexpr const CliCallback callbacks[]{makeCliCallback(ping), CliCallback()};
+
+} // namespace cli
 
 void setup() {
-  cliTask.create(cliCallbacks);
+  static SerialCliTask<Serial> task(cli::callbacks);
   vTaskStartScheduler();
 
   for (;;);

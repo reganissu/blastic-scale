@@ -1,6 +1,8 @@
-#include "StaticTask.h"
+#include <type_traits>
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
+#include "StaticTask.h"
+#include "MutexedPrint.h"
 
 /*
   Simple implementation of a command line interface over Serial.
@@ -74,38 +76,65 @@ private:
     return dword;
   }
 
-  friend void SerialCliLoop(typeof(Serial) &serial, const CliCallback *callbacks);
+  template <auto &, size_t> friend class SerialCliTask;
 };
 
-template <size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class SerialCliTask {
+#define makeCliCallback(func) CliCallback(#func, func)
+
+template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)>
+class SerialCliTask : public StaticTask<StackSize> {
 
 public:
-  StaticTask<StackSize> task;
-
-  SerialCliTask(typeof(Serial) &serial, const CliCallback *callbacks) : serial(serial), callbacks(callbacks) {}
-
-  /*
-    Setup the task.
-    Argument is an array of CliCallback structures, terminated by one dummy entry (callback.func == nullptr).
-  */
-  TaskHandle_t create(const CliCallback *callbacks) {
-    Serial.begin(9600);
-    while (!Serial);
+  SerialCliTask(const CliCallback *callbacks)
+      : StaticTask<StackSize>(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1),
+        callbacks(callbacks) {
+    serial.begin(9600);
+    while (!serial);
     serial.setTimeout(0);
-    this->callbacks = callbacks;
-    TaskHandle_t handle = task.create(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1);
-    if (!handle) serial.print(F("Failed to create serial CLI task!\n"));
-    return handle;
   }
 
-protected:
-  typeof(Serial) &serial;
+private:
   const CliCallback *callbacks;
 
-  static void loop(void *_this) {
-    auto &_thisRef = *reinterpret_cast<SerialCliTask *>(_this);
-    SerialCliLoop(_thisRef.serial, _thisRef.callbacks);
+  static void loop(void *_this) { reinterpret_cast<SerialCliTask *>(_this)->loop(); }
+  void loop() {
+    static String serialInput;
+    static char buff[32];
+    while (true) {
+      // Read from serial in chunks. This is non blocking as we used setTimeout(0) on initialization
+      auto buffRead = serial.readBytes(buff, sizeof(buff) - 1);
+      buff[buffRead] = '\0';
+      if (!buffRead) {
+        vTaskDelay(pdMS_TO_TICKS(250));
+        continue;
+      }
+      // input may contain the null character, sanitize to a newline
+      for (char *ch = buff; ch < buff + buffRead; ch++) *ch = *ch ?: '\n';
+      serialInput += buff;
+      // parse commands line by line
+      while (true) {
+        auto lineEnd = serialInput.indexOf('\n');
+        if (lineEnd == -1) {
+          if (serialInput.length() > 512) {
+            MutexedPrint<serial>().print(F("Buffer overflow while reading serial input!\n"));
+            serialInput = String();
+          }
+          break;
+        }
+        size_t commandStart = 0;
+        while (isspace(serialInput[commandStart])) commandStart++;
+        size_t commandEnd = commandStart;
+        while (!isspace(serialInput[commandEnd])) commandEnd++;
+        String args = serialInput.substring(commandEnd, lineEnd);
+        args.trim();
+        serialInput[commandEnd] = '\0';
+        auto commandHash = CliCallback::murmur3_32(serialInput.c_str() + commandStart);
+        auto callback = callbacks;
+        for (; callback->function && callback->cliCommandHash != commandHash; callback++);
+        if (callback->function) callback->function(args);
+        else MutexedPrint<serial>().print(F("Command not found.\n"));
+        serialInput.remove(0, lineEnd + 1);
+      }
+    }
   }
 };
-
-void SerialCliLoop(typeof(Serial) &serial, const CliCallback *callbacks);
