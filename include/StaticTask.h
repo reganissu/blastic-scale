@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
+namespace util {
+
 /*
   Utility class to allocate static buffers for FreeRTOS tasks.
 */
@@ -38,3 +40,5 @@ public:
 private:
   const TaskHandle_t handle;
 };
+
+} // namespace util

@@ -17,7 +17,7 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(ping), CliCallbac
 } // namespace cli
 
 void setup() {
-  static SerialCliTask<Serial> task(cli::callbacks);
+  static cli::SerialCliTask<Serial> task(cli::callbacks);
   vTaskStartScheduler();
 
   for (;;);

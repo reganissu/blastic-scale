@@ -4,6 +4,8 @@
 #include "StaticTask.h"
 #include "MutexedPrint.h"
 
+namespace cli {
+
 /*
   Simple implementation of a command line interface over Serial.
 
@@ -82,11 +84,11 @@ private:
 #define makeCliCallback(func) CliCallback(#func, func)
 
 template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)>
-class SerialCliTask : public StaticTask<StackSize> {
+class SerialCliTask : public util::StaticTask<StackSize> {
 
 public:
   SerialCliTask(const CliCallback *callbacks)
-      : StaticTask<StackSize>(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1),
+      : util::StaticTask<StackSize>(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1),
         callbacks(callbacks) {
     serial.begin(9600);
     while (!serial);
@@ -138,3 +140,5 @@ private:
     }
   }
 };
+
+} // namespace cli

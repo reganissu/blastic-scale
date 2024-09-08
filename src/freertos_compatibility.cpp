@@ -9,14 +9,14 @@
 */
 
 void vApplicationGetTimerTaskMemory(StaticTask_t **taskBuffer, StackType_t **stackBuffer, uint32_t *stackSize) {
-  static StaticTask timerTaskBuffers;
+  static util::StaticTask timerTaskBuffers;
   *taskBuffer = &timerTaskBuffers.taskBuffer;
   *stackBuffer = timerTaskBuffers.stack;
   *stackSize = sizeof(timerTaskBuffers.stack) / sizeof(timerTaskBuffers.stack[0]);
 }
 
 void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stackBuffer, uint32_t *stackSize) {
-  static StaticTask idleTaskBuffers;
+  static util::StaticTask idleTaskBuffers;
   *taskBuffer = &idleTaskBuffers.taskBuffer;
   *stackBuffer = idleTaskBuffers.stack;
   *stackSize = sizeof(idleTaskBuffers.stack) / sizeof(idleTaskBuffers.stack[0]);
