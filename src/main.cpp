@@ -1,18 +1,36 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 #include "SerialCliTask.h"
+#include "Scale.h"
 
-void loop() {}
+namespace blastic {
+
+struct [[gnu::packed]] EEPROMConfig {
+  Scale::EEPROMConfig scale;
+};
+
+static constexpr const EEPROMConfig defaultConfig{.scale = {.dataPin = 2, .clockPin = 3, .scale = 1.0}};
+
+Scale scale(defaultConfig.scale);
+
+} // namespace blastic
 
 namespace cli {
 
-static void ping(const String &params) {
+static void echo(const String &params) {
   auto p = MutexedPrint<Serial>();
-  p.print(F("pong, args: "));
+  p.print(F("echo: "));
   p.println(params);
 }
 
-static constexpr const CliCallback callbacks[]{makeCliCallback(ping), CliCallback()};
+static void weight(const String &) {
+  auto value = blastic::scale.read();
+  auto p = MutexedPrint<Serial>();
+  p.print(F("weight: "));
+  p.println(value);
+}
+
+static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCallback(weight), CliCallback()};
 
 } // namespace cli
 

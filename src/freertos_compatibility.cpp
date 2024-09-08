@@ -63,3 +63,7 @@ extern "C" void __wrap_free(void *ptr) {
   traceFREE(ptr, 0);
   xTaskResumeAll();
 }
+
+// empty loop, necessary for linking purposes but never run
+
+void loop() {}
