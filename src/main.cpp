@@ -1,13 +1,11 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
+#include "blastic.h"
 #include "SerialCliTask.h"
 #include "Scale.h"
+#include "Display.h"
 
 namespace blastic {
-
-struct [[gnu::packed]] EEPROMConfig {
-  Scale::EEPROMConfig scale;
-};
 
 static constexpr const EEPROMConfig defaultConfig{.scale = {.dataPin = 2, .clockPin = 3, .scale = 1.0}};
 
@@ -35,7 +33,8 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCal
 } // namespace cli
 
 void setup() {
-  static cli::SerialCliTask<Serial> task(cli::callbacks);
+  static cli::SerialCliTask<Serial> cli(cli::callbacks);
+  static util::StaticTask display(ui::loop, "DisplayTask");
   vTaskStartScheduler();
 
   for (;;);
