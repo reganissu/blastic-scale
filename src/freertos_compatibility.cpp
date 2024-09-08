@@ -27,6 +27,7 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
 /*
   FreeRTOS guide says "here is no real way to recover from a stack overflow
   when it occurs", so just spam the serial with the error in an endless loop.
+  TODO flash a led and stop the hardware
 */
 void vApplicationStackOverflowHook(TaskHandle_t, char *pcTaskName) {
   for (;;) {

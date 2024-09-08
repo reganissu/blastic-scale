@@ -28,8 +28,9 @@ public:
     configASSERT(handle);
   }
 
+  static_assert(sizeof(TaskFunction_t) == sizeof(voidFuncPtr));
   StaticTask(voidFuncPtr taskFunction, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1)
-      : StaticTask(static_cast<TaskFunction_t>(taskFunction), nullptr, name, priority) {}
+      : StaticTask(reinterpret_cast<TaskFunction_t>(taskFunction), nullptr, name, priority) {}
 
   StaticTask(const StaticTask &) = delete;
   StaticTask &operator=(const StaticTask &) = delete;
