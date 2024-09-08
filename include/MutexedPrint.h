@@ -1,3 +1,6 @@
+#ifndef _HEADER_MutexedPrint
+#define _HEADER_MutexedPrint
+
 #include <type_traits>
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
@@ -21,3 +24,5 @@ public:
 };
 
 } // namespace cli
+
+#endif

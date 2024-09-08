@@ -1,3 +1,6 @@
+#ifndef _HEADER_Scale
+#define _HEADER_Scale
+
 #include <Arduino.h>
 #include <HX711.h>
 
@@ -15,3 +18,5 @@ public:
 };
 
 } // namespace blastic
+
+#endif

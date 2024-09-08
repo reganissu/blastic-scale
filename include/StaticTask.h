@@ -1,3 +1,6 @@
+#ifndef _HEADER_StaticTask
+#define _HEADER_StaticTask
+
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
@@ -42,3 +45,5 @@ private:
 };
 
 } // namespace util
+
+#endif

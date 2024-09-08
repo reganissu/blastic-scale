@@ -1,3 +1,6 @@
+#ifndef _HEADER_SerialCliTask
+#define _HEADER_SerialCliTask
+
 #include <type_traits>
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
@@ -142,3 +145,5 @@ private:
 };
 
 } // namespace cli
+
+#endif
