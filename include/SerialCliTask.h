@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 #include "StaticTask.h"
-#include "MutexedPrint.h"
+#include "Mutexed.h"
 
 namespace cli {
 
@@ -103,6 +103,7 @@ private:
 
   static void loop(void *_this) { reinterpret_cast<SerialCliTask *>(_this)->loop(); }
   void loop() {
+    using MSerial = util::Mutexed<::Serial>;
     static String serialInput;
     static char buff[32];
     while (true) {
@@ -121,7 +122,7 @@ private:
         auto lineEnd = serialInput.indexOf('\n');
         if (lineEnd == -1) {
           if (serialInput.length() > 512) {
-            MutexedPrint<serial>().print(F("Buffer overflow while reading serial input!\n"));
+            MSerial()->print(F("Buffer overflow while reading serial input!\n"));
             serialInput = String();
           }
           break;
@@ -137,7 +138,7 @@ private:
         auto callback = callbacks;
         for (; callback->function && callback->cliCommandHash != commandHash; callback++);
         if (callback->function) callback->function(args);
-        else MutexedPrint<serial>().print(F("Command not found.\n"));
+        else MSerial()->print(F("Command not found.\n"));
         serialInput.remove(0, lineEnd + 1);
       }
     }

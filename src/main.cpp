@@ -15,17 +15,19 @@ Scale scale(defaultConfig.scale);
 
 namespace cli {
 
+using MSerial = util::Mutexed<::Serial>;
+
 static void echo(const String &params) {
-  auto p = MutexedPrint<Serial>();
-  p.print(F("echo: "));
-  p.println(params);
+  MSerial p;
+  p->print(F("echo: "));
+  p->println(params);
 }
 
 static void weight(const String &) {
   auto value = blastic::scale.read();
-  auto p = MutexedPrint<Serial>();
-  p.print(F("weight: "));
-  p.println(value);
+  MSerial p;
+  p->print(F("weight: "));
+  p->println(value);
 }
 
 static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCallback(weight), CliCallback()};
