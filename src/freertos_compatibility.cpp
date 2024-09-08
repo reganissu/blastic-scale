@@ -1,6 +1,6 @@
-#include "StaticTask.h"
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
+#include "StaticTask.h"
 
 #if configSUPPORT_STATIC_ALLOCATION == 1
 
