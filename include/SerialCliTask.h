@@ -52,7 +52,7 @@ public:
     // process leftover bytes (this is a no-op when there is none)
     h ^= murmur3_32_scramble(dword);
     // XOR with the string length
-    h ^= strStart - str;
+    h ^= str - strStart;
     h ^= h >> 16;
     h *= 0x85ebca6b;
     h ^= h >> 13;

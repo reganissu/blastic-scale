@@ -31,7 +31,7 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
 */
 void vApplicationStackOverflowHook(TaskHandle_t, char *pcTaskName) {
   for (;;) {
-    Serial.print(F("! stack overflow by task "));
+    Serial.print(F("Stack overflow by task "));
     Serial.println(reinterpret_cast<const char *>(pcTaskName));
     for (auto start_pause = millis(); millis() - start_pause < 1000;);
   }
