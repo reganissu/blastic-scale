@@ -90,20 +90,23 @@ template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(Sta
 class SerialCliTask : public util::StaticTask<StackSize> {
 
 public:
-  SerialCliTask(const CliCallback *callbacks)
+  SerialCliTask(const CliCallback *callbacks, const char *bootMessage = nullptr)
       : util::StaticTask<StackSize>(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1),
         callbacks(callbacks) {
     serial.begin(9600);
     while (!serial);
     serial.setTimeout(0);
+    // make sure that the static member initializer for the mutex runs
+    MSerial p;
+    if (bootMessage) p->print(bootMessage);
   }
 
 private:
+  using MSerial = util::Mutexed<::Serial>;
   const CliCallback *callbacks;
 
   static void loop(void *_this) { reinterpret_cast<SerialCliTask *>(_this)->loop(); }
   void loop() {
-    using MSerial = util::Mutexed<::Serial>;
     static String serialInput;
     static char buff[32];
     while (true) {

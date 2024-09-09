@@ -34,8 +34,14 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCal
 
 } // namespace cli
 
+#define stringify(x) #x
+#define stringify_value(x) stringify(x)
+
 void setup() {
-  static cli::SerialCliTask<Serial> cli(cli::callbacks);
+  delay(5000);
+  static cli::SerialCliTask<Serial> cli(
+      cli::callbacks,
+      String(F("Booted blastic-scale git commit " GIT_COMMIT " worktree " GIT_WORKTREE_STATUS ".\n")).c_str());
   static util::StaticTask display(ui::loop, "DisplayTask");
   vTaskStartScheduler();
 
