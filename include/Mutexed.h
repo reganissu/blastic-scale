@@ -17,6 +17,7 @@ public:
   ~Mutexed() { configASSERT(xSemaphoreGiveRecursive(Mutexed::mutex)); }
 
   auto operator->() const { return &obj; }
+  decltype(obj) operator*() const { return obj; }
 };
 
 } // namespace util

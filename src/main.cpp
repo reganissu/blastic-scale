@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
+#include <WiFiS3.h>
 #include "blastic.h"
 #include "SerialCliTask.h"
 #include "Scale.h"
@@ -30,12 +31,22 @@ static void weight(const String &) {
   p->println(value);
 }
 
-static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCallback(weight), CliCallback()};
+static void wifi(const String &args) {
+  MSerial p;
+  if(args == F("debug")) modem.debug(*p, 2);
+  auto status = WiFi.status();
+  auto version = WiFi.firmwareVersion();
+  modem.noDebug();
+  p->print(F("wifi status:"));
+  p->print(status);
+  p->print(F(" version:"));
+  p->println(version);
+}
+
+static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCallback(weight), makeCliCallback(wifi),
+                                               CliCallback()};
 
 } // namespace cli
-
-#define stringify(x) #x
-#define stringify_value(x) stringify(x)
 
 void setup() {
   // some gracetime to start `platformio device monitor` after upload or power on
