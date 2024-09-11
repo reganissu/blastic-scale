@@ -18,32 +18,46 @@ namespace cli {
 
 using MSerial = util::Mutexed<::Serial>;
 
-static void echo(const String &params) {
+static void version(String &) {
+  MSerial p;
+  p->print(F("version: " GIT_COMMIT " worktree " GIT_WORKTREE_STATUS "\n"));
+}
+
+static void echo(String &params) {
   MSerial p;
   p->print(F("echo: "));
   p->println(params);
 }
 
-static void weight(const String &) {
+namespace scale {
+
+static void weight(String &) {
   auto value = blastic::scale.read();
   MSerial p;
-  p->print(F("weight: "));
+  p->print(F("scale::weight: "));
   p->println(value);
 }
 
-static void wifi(const String &args) {
+} // namespace scale
+
+namespace wifi {
+
+static void status(String &args) {
   MSerial p;
-  if(args == F("debug")) modem.debug(*p, 2);
+  if (args == F("debug")) modem.debug(*p, 2);
   auto status = WiFi.status();
   auto version = WiFi.firmwareVersion();
   modem.noDebug();
-  p->print(F("wifi status:"));
+  p->print(F("wifi::status: status "));
   p->print(status);
-  p->print(F(" version:"));
+  p->print(F(" version "));
   p->println(version);
 }
 
-static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCallback(weight), makeCliCallback(wifi),
+} // namespace wifi
+
+static constexpr const CliCallback callbacks[]{makeCliCallback(version), makeCliCallback(echo),
+                                               makeCliCallback(scale::weight), makeCliCallback(wifi::status),
                                                CliCallback()};
 
 } // namespace cli

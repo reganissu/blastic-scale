@@ -33,7 +33,7 @@ class CliCallback {
   */
 
 public:
-  using CliFunctionPointer = void (*)(const String &params);
+  using CliFunctionPointer = void (*)(String &params);
 
   constexpr CliCallback() : cliCommandHash(0), function(nullptr) {}
 
@@ -41,18 +41,21 @@ public:
       : cliCommandHash(murmur3_32(str)), function(function) {}
 
   // Reference: https://en.wikipedia.org/wiki/MurmurHash#Algorithm
-  constexpr static uint32_t murmur3_32(const char *str) {
-    auto strStart = str;
-    uint32_t h = 0xfaa7c96c, dword = 0;
-    while (murmur3_32_dwordFromStr(str, dword)) {
+  constexpr static uint32_t murmur3_32(const char *const str) {
+    uint32_t h = 0xfaa7c96c, len = CliCallback::strlen(str), dwordLen = len & ~uint32_t(3),
+             leftoverBytes = len & uint32_t(3);
+    for (uint32_t i = 0; i < dwordLen; i += 4) {
+      uint32_t dword = 0;
+      for (uint32_t j = 0; j < 4; j++) dword |= str[i + j] << j * 8;
       h ^= murmur3_32_scramble(dword);
       h = (h << 13) | (h >> 19);
       h = h * 5 + 0xe6546b64;
     }
-    // process leftover bytes (this is a no-op when there is none)
-    h ^= murmur3_32_scramble(dword);
+    uint32_t partialDword = 0;
+    for (uint32_t i = 0; i < leftoverBytes; i++) partialDword |= str[dwordLen + i] << i * 8;
+    h ^= murmur3_32_scramble(partialDword);
     // XOR with the string length
-    h ^= str - strStart;
+    h ^= len;
     h ^= h >> 16;
     h *= 0x85ebca6b;
     h ^= h >> 13;
@@ -65,14 +68,8 @@ private:
   const uint32_t cliCommandHash;
   const CliFunctionPointer function;
 
-  constexpr static uint32_t murmur3_32_dwordFromStr(const char *&str, uint32_t &dword) {
-    dword = 0;
-    for (int i = 0; i < 4; i++) {
-      if (!str[i]) return false;
-      dword |= *str++ << i * 8;
-    }
-    return true;
-  }
+  // constexpr strlen
+  constexpr static uint32_t strlen(const char *const str) { return str[0] ? 1 + CliCallback::strlen(str + 1) : 0; }
 
   constexpr static uint32_t murmur3_32_scramble(uint32_t dword) {
     dword *= 0xcc9e2d51;
