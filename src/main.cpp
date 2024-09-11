@@ -38,8 +38,9 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(echo), makeCliCal
 #define stringify_value(x) stringify(x)
 
 void setup() {
-  delay(5000);
-  static cli::SerialCliTask<Serial> cli(
+  // some gracetime to start `platformio device monitor` after upload or power on
+  delay(1000);
+  static cli::SerialCliTask<Serial, 1024> cli(
       cli::callbacks,
       String(F("Booted blastic-scale git commit " GIT_COMMIT " worktree " GIT_WORKTREE_STATUS ".\n")).c_str());
   static util::StaticTask display(ui::loop, "DisplayTask");

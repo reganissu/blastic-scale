@@ -26,16 +26,12 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
 
 /*
   FreeRTOS guide says "here is no real way to recover from a stack overflow
-  when it occurs", so just spam the serial with the error in an endless loop.
-  TODO flash a led and stop the hardware
+  when it occurs". Here we trigger an hardware fault (call to invalid address)
+  in order to trigger a crash dump on Serial. The fault log is provided by
+  https://github.com/armink/CmBacktrace , which eventually prints an addr2line
+  command to show the stack trace.
 */
-void vApplicationStackOverflowHook(TaskHandle_t, char *pcTaskName) {
-  for (;;) {
-    Serial.print(F("Stack overflow by task "));
-    Serial.println(reinterpret_cast<const char *>(pcTaskName));
-    for (auto start_pause = millis(); millis() - start_pause < 1000;);
-  }
-}
+[[gnu::naked]] void vApplicationStackOverflowHook(TaskHandle_t, char *) { reinterpret_cast<voidFuncPtr>(0)(); }
 
 /*
   The Arduino Framework makes use (in some questionable places) of malloc/free,
