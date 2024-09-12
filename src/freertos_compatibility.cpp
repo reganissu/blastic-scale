@@ -30,6 +30,9 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
   in order to trigger a crash dump on Serial. The fault log is provided by
   https://github.com/armink/CmBacktrace , which eventually prints an addr2line
   command to show the stack trace.
+
+  The function is naked to avoid messing with the stack in an already broken
+  situation.
 */
 [[gnu::naked]] void vApplicationStackOverflowHook(TaskHandle_t, char *) { reinterpret_cast<voidFuncPtr>(0)(); }
 
@@ -38,7 +41,8 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
   new/delete. Unfortunately, the C library (and libfsp, which provides heap
   space in a .heap section) are precompiled and cannot be modified. Use the
   -Wl--wrapper linker trick to make these calls safe under FreeRTOS. This is a
-  copy of FreeRTOS heap management example Heap_3.c .
+  copy of FreeRTOS heap management example Heap_3.c, implementing serialized access
+  to malloc() and free().
 */
 extern "C" void *__real_malloc(size_t s);
 extern "C" void *__wrap_malloc(size_t s) {
@@ -62,5 +66,4 @@ extern "C" void __wrap_free(void *ptr) {
 }
 
 // empty loop, necessary for linking purposes but never run
-
 void loop() {}

@@ -7,7 +7,12 @@
 namespace util {
 
 /*
-  Utility class to allocate static buffers for FreeRTOS tasks.
+  Utility class to allocate static buffers for FreeRTOS tasks. Normally
+  used as static function variables.
+
+  The stack size can be configured in bytes (not StackType_t which is
+  sizeof(StackType_t) == 4 usually!), defaulting to the minimal FreeRTOS
+  stack size.
 */
 
 template <size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class StaticTask {

@@ -1,6 +1,7 @@
 #ifndef _HEADER_SerialCliTask
 #define _HEADER_SerialCliTask
 
+#include <algorithm>
 #include <type_traits>
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
@@ -9,31 +10,20 @@
 
 namespace cli {
 
+class WordSplit;
+
 /*
-  Simple implementation of a command line interface over Serial.
+  A CliCallback struct contains the MurMur3 hash of the command string, and
+  the corresponding function pointer to call.
 
-  The SerialCliTask implements a FreeRTOS task that reads from serial and
-  parses command in the form:
-    <command> [args...]
-  The list of commands is provided by the user as an array of CliCallback structures,
-  matching command strings to function pointers.
-
-  This CLI task runs with the highest priority available, in order to be able to work
-  even when other tasks hang for any reason.
+  The constructors are all constexpr, so that the compiler can avoid emitting
+  the string for the command.
 */
 
 class CliCallback {
 
-  /*
-    A CliCallback struct contains the MurMur3 hash of the command string, and
-    the corresponding function pointer to call.
-
-    The constructors are all constexpr, so that the compiler can avoid emitting
-    the string for the command.
-  */
-
 public:
-  using CliFunctionPointer = void (*)(String &params);
+  using CliFunctionPointer = void (*)(WordSplit &args);
 
   constexpr CliCallback() : cliCommandHash(0), function(nullptr) {}
 
@@ -54,7 +44,6 @@ public:
     uint32_t partialDword = 0;
     for (uint32_t i = 0; i < leftoverBytes; i++) partialDword |= str[dwordLen + i] << i * 8;
     h ^= murmur3_32_scramble(partialDword);
-    // XOR with the string length
     h ^= len;
     h ^= h >> 16;
     h *= 0x85ebca6b;
@@ -81,65 +70,148 @@ private:
   template <auto &, size_t> friend class SerialCliTask;
 };
 
+/*
+  Use makeCliCallback(ns::func) as CliCallback("ns::func", ns::func)
+*/
 #define makeCliCallback(func) CliCallback(#func, func)
+
+/*
+  Utility class to tokenize a string by spaces.
+  Each token returned by nextWord() is a pointer to the buffer
+  passed in the constructor, trimmed left and right of spaces.
+  The buffer is modified in-place with '\0' terminators, so
+  it is not possible to reuse WordSplit on the same pointer.
+*/
+
+class WordSplit {
+public:
+  char *str;
+
+  WordSplit(char *str) : str(str) {}
+
+  char *nextWord() {
+    while (*str && isspace(*str)) str++;
+    if (!*str) return nullptr;
+    auto result = str++;
+    while (*str && !isspace(*str)) str++;
+    if (*str) *str++ = '\0';
+    return result;
+  }
+};
+
+/*
+  Simple implementation of a command line interface over Serial.
+
+  The SerialCliTask implements a FreeRTOS task that reads from serial and
+  parses command in the form:
+
+    <command> [args...]
+
+  The list of commands is provided by the user as an array of CliCallback structures,
+  matching command strings to function pointers. This array can be created as a
+  constexpr expression, to avoid emitting the command strings in the binary:
+
+  static constexpr const CliCallback callbacks[]{
+    CliCallback("func1", ::func1),
+    CliCallback("func2", tools::func2),
+    CliCallback()
+  };
+
+  The terminating empty CliCallback() is necessary.
+
+  This CLI task runs with the highest priority available, in order to be able to work
+  even when other tasks hang for any reason.
+
+  This class is a template in order to use util::Mutexed<serial>.
+*/
 
 template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)>
 class SerialCliTask : public util::StaticTask<StackSize> {
 
 public:
-  SerialCliTask(const CliCallback *callbacks, const char *bootMessage = nullptr)
+  using MSerial = util::Mutexed<serial>;
+  // task delay in poll loop, milliseconds
+  static constexpr const int32_t pollInterval = 250;
+
+  // Note: the serial must be initialized alreay
+  SerialCliTask(const CliCallback *callbacks)
       : util::StaticTask<StackSize>(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1),
         callbacks(callbacks) {
-    serial.begin(9600);
-    while (!serial);
-    serial.setTimeout(0);
-    // make sure that the static member initializer for the mutex runs
-    MSerial p;
-    if (bootMessage) p->print(bootMessage);
+    /*
+      Read operations busy poll using millis(). This task
+      runs with the maximum priority, so we must not starve the other
+      tasks in blocking read operations. Polling with task delays is
+      handled in loop().
+    */
+    MSerial()->setTimeout(0);
   }
 
 private:
-  using MSerial = util::Mutexed<::Serial>;
   const CliCallback *callbacks;
 
   static void loop(void *_this) { reinterpret_cast<SerialCliTask *>(_this)->loop(); }
   void loop() {
-    static String serialInput;
-    static char buff[32];
+    /*
+      Avoid String usage at all costs because it uses realloc(),
+      shoot in your foot with pointer arithmetic.
+
+      This function reads serial input into a static buffer, and
+      parses a command line per '\n'-terminated line of input.
+
+      Command names are trimmed by WordSplit.
+    */
+    constexpr const size_t maxLen = std::min(255, SERIAL_BUFFER_SIZE - 1);
+    char serialInput[maxLen + 1];
+    static size_t len = 0;
+    // polling loop
     while (true) {
-      // Read from serial in chunks. This is non blocking as we used setTimeout(0) on initialization
-      auto buffRead = serial.readBytes(buff, sizeof(buff) - 1);
-      buff[buffRead] = '\0';
-      if (!buffRead) {
-        vTaskDelay(pdMS_TO_TICKS(250));
+      auto oldLen = len;
+      // this is non blocking as we used setTimeout(0) on initialization
+      len += serial.readBytes(serialInput + len, maxLen - len);
+      if (oldLen == len) {
+        vTaskDelay(pdMS_TO_TICKS(pollInterval));
         continue;
       }
       // input may contain the null character, sanitize to a newline
-      for (char *ch = buff; ch < buff + buffRead; ch++) *ch = *ch ?: '\n';
-      serialInput += buff;
-      // parse commands line by line
+      for (auto c = serialInput + oldLen; c < serialInput + len; c++) *c = *c ?: '\n';
+      // make sure this is always a valid C string
+      serialInput[len] = '\0';
+      // parse loop
       while (true) {
-        auto lineEnd = serialInput.indexOf('\n');
-        if (lineEnd == -1) {
-          if (serialInput.length() > 512) {
+        auto lineEnd = strchr(serialInput, '\n');
+        if (!lineEnd) {
+          if (len == maxLen) {
             MSerial()->print(F("Buffer overflow while reading serial input!\n"));
-            serialInput = String();
+            // discard buffer
+            len = 0;
           }
           break;
         }
-        size_t commandStart = 0;
-        while (isspace(serialInput[commandStart])) commandStart++;
-        size_t commandEnd = commandStart;
-        while (!isspace(serialInput[commandEnd])) commandEnd++;
-        String args = serialInput.substring(commandEnd, lineEnd);
-        args.trim();
-        serialInput[commandEnd] = '\0';
-        auto commandHash = CliCallback::murmur3_32(serialInput.c_str() + commandStart);
-        auto callback = callbacks;
-        for (; callback->function && callback->cliCommandHash != commandHash; callback++);
-        if (callback->function) callback->function(args);
-        else MSerial()->print(F("Command not found.\n"));
-        serialInput.remove(0, lineEnd + 1);
+        // truncate the command line C string at '\n'
+        *lineEnd = '\0';
+        WordSplit commandLine(serialInput);
+        auto command = commandLine.nextWord();
+        uint32_t commandHash;
+        // skip if line is empty
+        if (!command || !*command) goto shiftLeftBuffer;
+        commandHash = CliCallback::murmur3_32(command);
+        for (auto callback = callbacks; callback->function; callback++)
+          if (callback->cliCommandHash == commandHash) {
+            callback->function(commandLine);
+            goto shiftLeftBuffer;
+          }
+        {
+          MSerial mserial;
+          mserial->print(F("Command "));
+          mserial->print(command);
+          mserial->print(F(" not found.\n"));
+        }
+        // move bytes after newline to start of buffer, repeat
+      shiftLeftBuffer:
+        auto nextLine = lineEnd + 1;
+        auto leftoverLen = len - (nextLine - serialInput);
+        memmove(serialInput, nextLine, leftoverLen);
+        len = leftoverLen;
       }
     }
   }
