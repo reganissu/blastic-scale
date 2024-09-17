@@ -24,6 +24,8 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
 
 #endif
 
+#if configCHECK_FOR_STACK_OVERFLOW > 0
+
 /*
   FreeRTOS guide says "here is no real way to recover from a stack overflow
   when it occurs". Here we trigger an hardware fault (call to invalid address)
@@ -36,34 +38,24 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stac
 */
 [[gnu::naked]] void vApplicationStackOverflowHook(TaskHandle_t, char *) { reinterpret_cast<voidFuncPtr>(0)(); }
 
+#endif
+
 /*
   The Arduino Framework makes use (in some questionable places) of malloc/free,
   new/delete. Unfortunately, the C library (and libfsp, which provides heap
   space in a .heap section) are precompiled and cannot be modified. Use the
-  -Wl--wrapper linker trick to make these calls safe under FreeRTOS. This is a
-  copy of FreeRTOS heap management example Heap_3.c, implementing serialized access
-  to malloc() and free().
-*/
-extern "C" void *__real_malloc(size_t s);
-extern "C" void *__wrap_malloc(size_t s) {
-  vTaskSuspendAll();
-  auto ptr = __real_malloc(s);
-  traceMALLOC(ptr, s);
-  xTaskResumeAll();
-#if (configUSE_MALLOC_FAILED_HOOK == 1)
-  if (!ptr) vApplicationMallocFailedHook();
-#endif
-  return ptr;
-}
+  -Wl--wrapper linker trick to make these calls safe under FreeRTOS.
 
-extern "C" void __real_free(void *ptr);
-extern "C" void __wrap_free(void *ptr) {
-  if (!ptr) return;
-  vTaskSuspendAll();
-  __real_free(ptr);
-  traceFREE(ptr, 0);
-  xTaskResumeAll();
-}
+  Arduino Framework uses picolib, which makes malloc and friends safe by using
+  a lock (compiled to a no-op, since Arduino assumes it is single-thread). Here
+  hook _malloc_lock/__malloc_unlock to vTaskSuspendAll/xTaskResumeAll. This
+  ensures that all access to the heap (malloc/realloc/calloc...) is safe.
+*/
+extern "C" void __real___malloc_lock(_reent *);
+extern "C" void __wrap___malloc_lock(_reent *) { vTaskSuspendAll(); }
+
+extern "C" void __real___malloc_unlock(_reent *);
+extern "C" void __wrap___malloc_unlock(_reent *) { xTaskResumeAll(); }
 
 // empty loop, necessary for linking purposes but never run
-void loop() {}
+void loop() { reinterpret_cast<voidFuncPtr>(0)(); }
