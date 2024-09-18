@@ -3,19 +3,17 @@
 
 namespace blastic {
 
-struct [[gnu::packed]] EEPROMConfig {
-  Scale::EEPROMConfig scale;
-  WifiConnection::EEPROMConfig wifi;
-};
-
 static constexpr const char PROGMEM version[] = {GIT_COMMIT " worktree " GIT_WORKTREE_STATUS};
-static constexpr const EEPROMConfig defaultConfig{
-    .scale = {.dataPin = 2, .clockPin = 3, .scale = 1.0},
-    .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10}};
+
+// initialize configuration with sane defaults
+EEPROMConfig config{.scale = {.dataPin = 2,
+                              .clockPin = 3,
+                              .chanAMode = scale::gain_t::GAIN_128,
+                              .calibrationChanA128 = {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
+                              .calibrationChanA64 = {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}},
+                    .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10}};
 
 bool debug = false;
-
-Scale scale(defaultConfig.scale);
 
 namespace cli {
 
@@ -44,11 +42,20 @@ static void echo(WordSplit &args) {
 
 namespace scale {
 
-static void weight(WordSplit &) {
-  auto value = blastic::scale.read();
+static void raw(WordSplit &) {
+  auto value = blastic::scale::raw(config.scale, 1, pdMS_TO_TICKS(1000));
+  MSerial serial;
+  serial->print(F("scale::raw: "));
+  value == blastic::scale::invalidRead ? serial->println(F("invalid")) : serial->println(value);
+}
+
+static void weight(WordSplit &args) {
+  auto medianWidthArg = args.nextWord();
+  auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), 16);
+  auto value = blastic::scale::weight(config.scale, medianWidth, pdMS_TO_TICKS(1000));
   MSerial serial;
   serial->print(F("scale::weight: "));
-  serial->println(value);
+  value == blastic::scale::invalidWeight ? serial->println(F("invalid")) : serial->println(value);
 }
 
 } // namespace scale
@@ -83,7 +90,7 @@ static void connect(WordSplit &args) {
     serial->print(F("missing ssid argument\n"));
     return;
   }
-  WifiConnection::EEPROMConfig config = defaultConfig.wifi;
+  WifiConnection::EEPROMConfig config = blastic::config.wifi;
   strncpy(config.ssid, ssid, sizeof(config.ssid) - 1);
   if (password) strncpy(config.password, password, sizeof(config.password) - 1);
   else config.password[0] = '\0';
@@ -136,13 +143,10 @@ static void connect(WordSplit &args) {
 
 } // namespace wifi
 
-static constexpr const CliCallback callbacks[]{makeCliCallback(version),
-                                               makeCliCallback(debug),
-                                               makeCliCallback(echo),
-                                               makeCliCallback(scale::weight),
-                                               makeCliCallback(wifi::status),
-                                               makeCliCallback(wifi::connect),
-                                               CliCallback()};
+static constexpr const CliCallback callbacks[]{makeCliCallback(version),       makeCliCallback(debug),
+                                               makeCliCallback(echo),          makeCliCallback(scale::raw),
+                                               makeCliCallback(scale::weight), makeCliCallback(wifi::status),
+                                               makeCliCallback(wifi::connect), CliCallback()};
 
 } // namespace cli
 

@@ -15,11 +15,15 @@ namespace blastic {
 
 extern bool debug;
 
-extern Scale scale;
+struct [[gnu::packed]] EEPROMConfig {
+  scale::EEPROMConfig scale;
+  WifiConnection::EEPROMConfig wifi;
+};
+
+extern EEPROMConfig config;
 
 // take these mutexes to access a global device
 using MSerial = util::Mutexed<::Serial>;
-using MScale = util::Mutexed<scale>;
 using MWiFi = util::Mutexed<::WiFi>;
 
 } // namespace blastic

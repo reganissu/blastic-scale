@@ -1,7 +1,8 @@
-#include <cstdio>
 #include "blastic.h"
 #include <ArduinoGraphics.h>
 #include <Arduino_LED_Matrix.h>
+
+namespace blastic {
 
 namespace ui {
 
@@ -10,7 +11,7 @@ void loop() {
   leds.begin();
   while (true) {
     vTaskDelay(pdMS_TO_TICKS(100));
-    auto weight = blastic::scale.read();
+    auto weight = blastic::scale::weight(config.scale);
     leds.beginDraw();
     leds.textFont(Font_4x6);
     leds.beginText(0, 0, 0xFFFFFF);
@@ -21,3 +22,5 @@ void loop() {
 }
 
 } // namespace ui
+
+} // namespace blastic
