@@ -59,8 +59,6 @@ extern "C" void __wrap___malloc_unlock(_reent *) { xTaskResumeAll(); }
 
 /*
   Hook failed assert to a Serial print, then throw a stack trace every 10 seconds.
-
-  Function argument unused to save flash space.
 */
 extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression) {
   using namespace blastic;

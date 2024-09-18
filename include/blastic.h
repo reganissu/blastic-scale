@@ -13,6 +13,8 @@
 
 namespace blastic {
 
+extern bool debug;
+
 extern Scale scale;
 
 // take these mutexes to access a global device
