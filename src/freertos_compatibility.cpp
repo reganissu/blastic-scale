@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 #include "StaticTask.h"
+#include <cm_backtrace/cm_backtrace.h>
 
 #if configSUPPORT_STATIC_ALLOCATION == 1
 
@@ -56,6 +57,56 @@ extern "C" void __wrap___malloc_lock(_reent *) { vTaskSuspendAll(); }
 
 extern "C" void __real___malloc_unlock(_reent *);
 extern "C" void __wrap___malloc_unlock(_reent *) { xTaskResumeAll(); }
+
+/*
+  Hook failed assert to a Serial print, then throw a stack trace every 10 seconds.
+
+  Function argument unused to save flash space.
+*/
+extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression) {
+  using namespace blastic;
+  uint32_t stackTrace[CMB_CALL_STACK_MAX_DEPTH];
+  auto stackDepth = cm_backtrace_call_stack(stackTrace, CMB_CALL_STACK_MAX_DEPTH, cmb_get_sp());
+  constexpr const int sleepMillis = 10000;
+  while (true) {
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+      vTaskPrioritySet(nullptr, tskIDLE_PRIORITY);
+      MSerial serial;
+      if (!*serial) serial->begin(9600);
+      while (!*serial);
+      vTaskPrioritySet(nullptr, configMAX_PRIORITIES - 1);
+      serial->print(F("assert: "));
+      serial->print(file);
+      serial->print(':');
+      serial->print(line);
+      serial->print(F(" failed expression "));
+      serial->println(failedExpression);
+      serial->print(F("assert: addr2line -e $FIRMWARE_FILE -a -f -C "));
+      for (int i = 0; i < stackDepth; i++) {
+        serial->print(' ');
+        serial->print(stackTrace[i], 16);
+      }
+      serial->println();
+      vTaskDelay(pdMS_TO_TICKS(sleepMillis));
+    } else {
+      if (!Serial) Serial.begin(9600);
+      while (!Serial);
+      Serial.print(F("assert: "));
+      Serial.print(file);
+      Serial.print(':');
+      Serial.print(line);
+      Serial.print(F(" failed expression "));
+      Serial.println(failedExpression);
+      Serial.print(F("assert: addr2line -e $FIRMWARE_FILE -a -f -C "));
+      for (int i = 0; i < stackDepth; i++) {
+        Serial.print(' ');
+        Serial.print(stackTrace[i], 16);
+      }
+      Serial.println();
+      delay(sleepMillis);
+    }
+  }
+}
 
 // empty loop, necessary for linking purposes but never run
 void loop() { reinterpret_cast<voidFuncPtr>(0)(); }
