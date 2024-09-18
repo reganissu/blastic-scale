@@ -54,16 +54,17 @@ static void weight(WordSplit &) {
 namespace wifi {
 
 static void status(WordSplit &args) {
-  MSerial serial;
   uint8_t status;
   char firmwareVersion[12];
   {
     MWiFi wifi;
-    if (debug) modem.debug(*serial, 2);
+    MSerial serial(debug);
+    if (serial.taken()) modem.debug(*serial, 2);
     status = wifi->status();
     strncpy(firmwareVersion, wifi->firmwareVersion(), sizeof(firmwareVersion) - 1);
     modem.noDebug();
   }
+  MSerial serial;
   serial->print(F("wifi::status: status "));
   serial->print(status);
   serial->print(F(" version "));
@@ -73,9 +74,9 @@ static void status(WordSplit &args) {
 static void connect(WordSplit &args) {
   auto ssid = args.nextWord();
   auto password = args.nextWord();
-  MSerial serial;
   auto outPrefix = F("wifi::connect: ");
   if (!ssid) {
+    MSerial serial;
     serial->print(outPrefix);
     serial->print(F("missing ssid argument\n"));
     return;
@@ -85,16 +86,20 @@ static void connect(WordSplit &args) {
   strncpy(config.ssid, ssid, sizeof(config.ssid) - 1);
   if (password) strncpy(config.password, password, sizeof(config.password) - 1);
 
-  serial->print(outPrefix);
-  serial->print(F("begin connection to "));
-  serial->println(config.ssid);
+  {
+    MSerial serial;
+    serial->print(outPrefix);
+    serial->print(F("begin connection to "));
+    serial->println(config.ssid);
+  }
 
   uint8_t bssid[6];
   int32_t rssi;
   IPAddress ip, gateway, dns1, dns2;
   {
     WifiConnection wifi(config);
-    if (debug) modem.debug(*serial, 2);
+    MSerial serial(debug);
+    if (serial.taken()) modem.debug(*serial, 2);
     auto status = wifi->status();
     serial->print(outPrefix);
     if (status != WL_CONNECTED) {
@@ -111,6 +116,7 @@ static void connect(WordSplit &args) {
     modem.noDebug();
   }
 
+  MSerial serial;
   serial->print(outPrefix);
   serial->print(F("bssid "));
   for (auto b : bssid) serial->print(b, 16);
