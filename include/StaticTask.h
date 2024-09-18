@@ -26,28 +26,42 @@ public:
   StaticTask() : handle(nullptr) {}
 
   template <typename ArgType>
-  StaticTask(TaskFunction_t taskFunction, ArgType arg, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1)
-      : handle(xTaskCreateStatic(taskFunction, name, sizeof(stack) / sizeof(stack[0]), static_cast<void *>(arg),
-                                 priority, stack, &taskBuffer)) {
-    static_assert(sizeof(ArgType) == sizeof(void *));
-    configASSERT(handle);
+  StaticTask(TaskFunction_t taskFunction, ArgType arg, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1) {
+    init(taskFunction, arg, name, priority);
   }
 
-  static_assert(sizeof(TaskFunction_t) == sizeof(voidFuncPtr));
-  StaticTask(voidFuncPtr taskFunction, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1)
-      : StaticTask(reinterpret_cast<TaskFunction_t>(taskFunction), nullptr, name, priority) {}
+  StaticTask(voidFuncPtr taskFunction, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1) {
+    init(taskFunction, name, priority);
+  }
+
+  template <typename ArgType>
+  TaskHandle_t init(TaskFunction_t taskFunction, ArgType arg, const char *name,
+                    UBaseType_t priority = tskIDLE_PRIORITY + 1) {
+    static_assert(sizeof(ArgType) == sizeof(void *));
+    configASSERT(!handle);
+    handle = xTaskCreateStatic(taskFunction, name, sizeof(stack) / sizeof(stack[0]), static_cast<void *>(arg), priority,
+                               stack, &taskBuffer);
+    configASSERT(handle);
+    return handle;
+  }
+
+  TaskHandle_t init(voidFuncPtr taskFunction, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1) {
+    static_assert(sizeof(TaskFunction_t) == sizeof(voidFuncPtr));
+    return init(reinterpret_cast<TaskFunction_t>(taskFunction), nullptr, name, priority);
+  }
 
   StaticTask(const StaticTask &) = delete;
   StaticTask &operator=(const StaticTask &) = delete;
 
   operator TaskHandle_t() const { return handle; }
+  operator bool() const { return handle; }
 
   ~StaticTask() {
     if (handle) vTaskDelete(handle);
   }
 
 private:
-  const TaskHandle_t handle;
+  TaskHandle_t handle = nullptr;
 };
 
 } // namespace util

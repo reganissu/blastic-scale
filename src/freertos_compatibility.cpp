@@ -1,5 +1,4 @@
-#include <Arduino.h>
-#include <Arduino_FreeRTOS.h>
+#include "blastic.h"
 #include "StaticTask.h"
 #include <cm_backtrace/cm_backtrace.h>
 

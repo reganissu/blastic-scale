@@ -1,8 +1,10 @@
 #include <cstdio>
-#include "Display.h"
 #include "blastic.h"
+#include <ArduinoGraphics.h>
+#include <Arduino_LED_Matrix.h>
 
 namespace ui {
+
 void loop() {
   static ArduinoLEDMatrix leds;
   leds.begin();
@@ -17,4 +19,5 @@ void loop() {
     leds.endDraw();
   }
 }
+
 } // namespace ui

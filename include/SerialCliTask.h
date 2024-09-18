@@ -2,11 +2,12 @@
 #define _HEADER_SerialCliTask
 
 #include <algorithm>
-#include <type_traits>
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
-#include "StaticTask.h"
 #include "Mutexed.h"
+#include "StaticTask.h"
+
+namespace blastic {
 
 namespace cli {
 
@@ -97,6 +98,11 @@ public:
     if (*str) *str++ = '\0';
     return result;
   }
+
+  bool nextWordIs(const char *str) {
+    auto word = nextWord();
+    return word && !strcmp(word, str);
+  }
 };
 
 /*
@@ -129,7 +135,6 @@ template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(Sta
 class SerialCliTask : public util::StaticTask<StackSize> {
 
 public:
-  using MSerial = util::Mutexed<serial>;
   // task delay in poll loop, milliseconds
   static constexpr const int32_t pollInterval = 250;
 
@@ -218,5 +223,7 @@ private:
 };
 
 } // namespace cli
+
+} // namespace blastic
 
 #endif
