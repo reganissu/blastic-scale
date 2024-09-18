@@ -9,7 +9,9 @@ struct [[gnu::packed]] EEPROMConfig {
 };
 
 static constexpr const char PROGMEM version[] = {GIT_COMMIT " worktree " GIT_WORKTREE_STATUS};
-static constexpr const EEPROMConfig defaultConfig{.scale = {.dataPin = 2, .clockPin = 3, .scale = 1.0}};
+static constexpr const EEPROMConfig defaultConfig{
+    .scale = {.dataPin = 2, .clockPin = 3, .scale = 1.0},
+    .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10}};
 
 bool debug = false;
 
@@ -81,10 +83,10 @@ static void connect(WordSplit &args) {
     serial->print(F("missing ssid argument\n"));
     return;
   }
-  WifiConnection::EEPROMConfig config;
-  config.timeoutSec = 10;
+  WifiConnection::EEPROMConfig config = defaultConfig.wifi;
   strncpy(config.ssid, ssid, sizeof(config.ssid) - 1);
   if (password) strncpy(config.password, password, sizeof(config.password) - 1);
+  else config.password[0] = '\0';
 
   {
     MSerial serial;
@@ -129,8 +131,7 @@ static void connect(WordSplit &args) {
   serial->print(F(" dns1 "));
   serial->print(dns1);
   serial->print(F(" dns2 "));
-  serial->print(dns2);
-  serial->println();
+  serial->println(dns2);
 }
 
 } // namespace wifi
