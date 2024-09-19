@@ -1,17 +1,20 @@
+#include <iterator>
 #include "blastic.h"
 #include "SerialCliTask.h"
 
 namespace blastic {
 
-static constexpr const char PROGMEM version[] = {GIT_COMMIT " worktree " GIT_WORKTREE_STATUS};
+static constexpr const char version[] = {GIT_COMMIT " worktree " GIT_WORKTREE_STATUS};
 
 // initialize configuration with sane defaults
-EEPROMConfig config{.scale = {.dataPin = 2,
-                              .clockPin = 3,
-                              .chanAMode = scale::gain_t::GAIN_128,
-                              .calibrationChanA128 = {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
-                              .calibrationChanA64 = {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}},
-                    .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10}};
+EEPROMConfig config = {.scale = {.dataPin = 2,
+                                 .clockPin = 3,
+                                 .mode = scale::HX711Mode::A128,
+                                 .calibrations = {{.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
+                                                  {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
+                                                  {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
+                       // XXX GCC bug, cannot use initializer lists with strings
+                       .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10}};
 
 bool debug = false;
 
@@ -24,10 +27,9 @@ static void version(WordSplit &) {
 }
 
 static void debug(WordSplit &args) {
-  blastic::debug = args.nextWordIs("on");
   MSerial serial;
   serial->print(F("debug: "));
-  serial->println(blastic::debug ? F("on") : F("off"));
+  serial->print((blastic::debug = args.nextWordIs("on")) ? F("on\n") : F("off\n"));
 }
 
 static void echo(WordSplit &args) {
@@ -42,20 +44,84 @@ static void echo(WordSplit &args) {
 
 namespace scale {
 
-static void raw(WordSplit &) {
-  auto value = blastic::scale::raw(config.scale, 1, pdMS_TO_TICKS(1000));
+using namespace blastic::scale;
+constexpr const uint32_t scaleCliTimeout = 2000, scaleCliMaxMedianWidth = 16;
+
+static void mode(WordSplit &args) {
+  auto modeString = args.nextWord();
+  MSerial serial;
+  serial->print(F("scale::mode: "));
+  if (!modeString) {
+    serial->print("missing mode argument\n");
+    return;
+  }
+  for (uint8_t i = 0; i < std::size(HX711ModeStrings); i++) {
+    if (strcmp(modeString, HX711ModeStrings[i])) continue;
+    config.scale.mode = HX711Mode(i);
+    serial->println(modeString);
+    return;
+  }
+  serial->print("invalid\n");
+}
+
+static void tare(WordSplit &) {
+  auto value = raw(config.scale, scaleCliMaxMedianWidth, pdMS_TO_TICKS(scaleCliTimeout));
+  MSerial serial;
+  serial->print(F("scale::tare: "));
+  if (value == invalidRead) {
+    serial->print("failed to get measurements for tare\n");
+    return;
+  }
+  auto &calibration = config.scale.calibrations[uint8_t(config.scale.mode)];
+  calibration.tareRawRead = value;
+  serial->println(value);
+}
+
+static void calibrate(WordSplit &args) {
+  auto weightString = args.nextWord();
+  if (!weightString) {
+    MSerial()->print("scale::calibrate: missing test weight argument\n");
+    return;
+  }
+  char *end;
+  auto weight = strtof(weightString, &end);
+  if (weightString == end) {
+    MSerial()->print("scale::calibrate: cannot parse test weight argument\n");
+    return;
+  }
+  auto value = raw(config.scale, scaleCliMaxMedianWidth, pdMS_TO_TICKS(scaleCliTimeout));
+  MSerial serial;
+  serial->print(F("scale::calibrate: "));
+  if (value == invalidRead) {
+    serial->print("failed to get measurements for calibration\n");
+    return;
+  }
+  auto &calibration = config.scale.calibrations[uint8_t(config.scale.mode)];
+  calibration.weightRawRead = value, calibration.weight = weight;
+  serial->println(value);
+}
+
+static void raw(WordSplit &args) {
+  auto medianWidthArg = args.nextWord();
+  auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), scaleCliMaxMedianWidth);
+  auto value = blastic::scale::raw(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
   serial->print(F("scale::raw: "));
-  value == blastic::scale::invalidRead ? serial->println(F("invalid")) : serial->println(value);
+  value == invalidRead ? serial->print(F("invalid\n")) : serial->println(value);
 }
 
 static void weight(WordSplit &args) {
+  auto &calibration = config.scale.calibrations[uint8_t(config.scale.mode)];
+  if (calibration.weightRawRead - calibration.tareRawRead == 0) {
+    MSerial()->print("scale::weight: cannot calculate weight without calibration parameters\n");
+    return;
+  }
   auto medianWidthArg = args.nextWord();
-  auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), 16);
-  auto value = blastic::scale::weight(config.scale, medianWidth, pdMS_TO_TICKS(1000));
+  auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), scaleCliMaxMedianWidth);
+  auto value = blastic::scale::weight(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
   serial->print(F("scale::weight: "));
-  value == blastic::scale::invalidWeight ? serial->println(F("invalid")) : serial->println(value);
+  value == invalidWeight ? serial->print(F("invalid\n")) : serial->println(value);
 }
 
 } // namespace scale
@@ -83,11 +149,8 @@ static void status(WordSplit &args) {
 static void connect(WordSplit &args) {
   auto ssid = args.nextWord();
   auto password = args.nextWord();
-  auto outPrefix = F("wifi::connect: ");
   if (!ssid) {
-    MSerial serial;
-    serial->print(outPrefix);
-    serial->print(F("missing ssid argument\n"));
+    MSerial()->print("wifi::connect: missing ssid argument\n");
     return;
   }
   WifiConnection::EEPROMConfig config = blastic::config.wifi;
@@ -97,8 +160,7 @@ static void connect(WordSplit &args) {
 
   {
     MSerial serial;
-    serial->print(outPrefix);
-    serial->print(F("begin connection to "));
+    serial->print("wifi::connect: begin connection to ");
     serial->println(config.ssid);
   }
 
@@ -110,15 +172,14 @@ static void connect(WordSplit &args) {
     MSerial serial(debug);
     if (serial.taken()) modem.debug(*serial, 2);
     auto status = wifi->status();
-    serial->print(outPrefix);
     if (status != WL_CONNECTED) {
       modem.noDebug();
-      serial->print(F("connection failed ("));
+      serial->print(F("wifi::connect: connection failed ("));
       serial->print(status);
       serial->println(')');
       return;
     }
-    serial->print(F("connected\n"));
+    serial->print(F("wifi::connect: connected\n"));
     wifi->BSSID(bssid);
     rssi = wifi->RSSI();
     ip = wifi->localIP(), gateway = wifi->gatewayIP(), dns1 = wifi->dnsIP(0), dns2 = wifi->dnsIP(1);
@@ -126,8 +187,7 @@ static void connect(WordSplit &args) {
   }
 
   MSerial serial;
-  serial->print(outPrefix);
-  serial->print(F("bssid "));
+  serial->print(F("wifi::connect: bssid "));
   for (auto b : bssid) serial->print(b, 16);
   serial->print(F(" rssi "));
   serial->print(rssi);
@@ -143,10 +203,17 @@ static void connect(WordSplit &args) {
 
 } // namespace wifi
 
-static constexpr const CliCallback callbacks[]{makeCliCallback(version),       makeCliCallback(debug),
-                                               makeCliCallback(echo),          makeCliCallback(scale::raw),
-                                               makeCliCallback(scale::weight), makeCliCallback(wifi::status),
-                                               makeCliCallback(wifi::connect), CliCallback()};
+static constexpr const CliCallback callbacks[]{makeCliCallback(version),
+                                               makeCliCallback(debug),
+                                               makeCliCallback(echo),
+                                               makeCliCallback(scale::mode),
+                                               makeCliCallback(scale::tare),
+                                               makeCliCallback(scale::calibrate),
+                                               makeCliCallback(scale::raw),
+                                               makeCliCallback(scale::weight),
+                                               makeCliCallback(wifi::status),
+                                               makeCliCallback(wifi::connect),
+                                               CliCallback()};
 
 } // namespace cli
 

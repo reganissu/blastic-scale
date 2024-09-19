@@ -8,15 +8,17 @@ namespace blastic {
 
 namespace scale {
 
-enum class gain_t : uint8_t { GAIN_128, GAIN_64 };
+// HX711Mode can be cast to an integer and used as index in arrays below
+enum class HX711Mode : uint8_t { A128 = 0, B = 1, A64 = 2 };
+constexpr const char *HX711ModeStrings[] = {"A128", "B", "A64"};
 
 struct [[gnu::packed]] EEPROMConfig {
   uint8_t dataPin, clockPin;
-  gain_t chanAMode;
+  HX711Mode mode;
   struct [[gnu::packed]] calibration {
     int32_t tareRawRead, weightRawRead;
     float weight;
-  } calibrationChanA128, calibrationChanA64;
+  } calibrations[3];
 };
 
 constexpr const int32_t invalidRead = 0x800000;
@@ -26,13 +28,12 @@ constexpr const uint32_t minReadDelayMillis = 1000 / 80;
 int32_t raw(const EEPROMConfig &config, size_t medianWidth = 1, TickType_t timeout = portMAX_DELAY);
 
 inline float weight(const EEPROMConfig &config, size_t medianWidth = 1, TickType_t timeout = portMAX_DELAY) {
-  auto &calib = config.chanAMode == gain_t::GAIN_64 ? config.calibrationChanA64 : config.calibrationChanA128;
-  if (calib.weightRawRead - calib.tareRawRead == 0)
-    return invalidWeight;
+  auto &calibration = config.calibrations[uint8_t(config.mode)];
+  if (calibration.weightRawRead - calibration.tareRawRead == 0) return invalidWeight;
   auto value = raw(config, medianWidth, timeout);
-  if (value == invalidRead)
-    return invalidWeight;
-  return calib.weight * float(value - calib.tareRawRead) / float(calib.weightRawRead - calib.tareRawRead);
+  if (value == invalidRead) return invalidWeight;
+  return calibration.weight * float(value - calibration.tareRawRead) /
+         float(calibration.weightRawRead - calibration.tareRawRead);
 }
 
 } // namespace scale

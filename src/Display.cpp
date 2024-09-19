@@ -15,7 +15,7 @@ void loop() {
     leds.beginDraw();
     leds.textFont(Font_4x6);
     leds.beginText(0, 0, 0xFFFFFF);
-    leds.println(weight / 1000, 4);
+    leds.println(weight, 4);
     leds.endText();
     leds.endDraw();
   }
