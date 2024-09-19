@@ -186,7 +186,7 @@ private:
         auto lineEnd = strchr(serialInput, '\n');
         if (!lineEnd) {
           if (len == maxLen) {
-            MSerial()->print(F("Buffer overflow while reading serial input!\n"));
+            MSerial()->print("Buffer overflow while reading serial input!\n");
             // discard buffer
             len = 0;
           }
@@ -207,9 +207,9 @@ private:
           }
         {
           MSerial mserial;
-          mserial->print(F("Command "));
+          mserial->print("Command ");
           mserial->print(command);
-          mserial->print(F(" not found.\n"));
+          mserial->print(" not found.\n");
         }
         // move bytes after newline to start of buffer, repeat
       shiftLeftBuffer:

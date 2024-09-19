@@ -41,7 +41,7 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
       release();
       if (debug) {
         MSerial serial;
-        serial->print(F("scale: timed out waiting for data, median index "));
+        serial->print("scale: timed out waiting for data, median index ");
         serial->println(i);
       }
       return invalidRead;

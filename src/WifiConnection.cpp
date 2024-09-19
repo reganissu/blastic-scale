@@ -17,7 +17,7 @@ static void timeoutDisconnect() {
       modem.noDebug();
       lastUnusedTime = 0;
     }
-    MSerial()->print(F("wifi: disconneted\n"));
+    MSerial()->print("wifi: disconneted\n");
   }
 }
 

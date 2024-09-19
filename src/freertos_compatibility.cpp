@@ -72,13 +72,13 @@ extern "C" void __wrap___assert_func(const char *file, int line, const char *, c
       if (!*serial) serial->begin(9600);
       while (!*serial);
       vTaskPrioritySet(nullptr, configMAX_PRIORITIES - 1);
-      serial->print(F("assert: "));
+      serial->print("assert: ");
       serial->print(file);
       serial->print(':');
       serial->print(line);
-      serial->print(F(" failed expression "));
+      serial->print(" failed expression ");
       serial->println(failedExpression);
-      serial->print(F("assert: addr2line -e $FIRMWARE_FILE -a -f -C "));
+      serial->print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
       for (int i = 0; i < stackDepth; i++) {
         serial->print(' ');
         serial->print(stackTrace[i], 16);
@@ -88,13 +88,13 @@ extern "C" void __wrap___assert_func(const char *file, int line, const char *, c
     } else {
       if (!Serial) Serial.begin(9600);
       while (!Serial);
-      Serial.print(F("assert: "));
+      Serial.print("assert: ");
       Serial.print(file);
       Serial.print(':');
       Serial.print(line);
-      Serial.print(F(" failed expression "));
+      Serial.print(" failed expression ");
       Serial.println(failedExpression);
-      Serial.print(F("assert: addr2line -e $FIRMWARE_FILE -a -f -C "));
+      Serial.print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
       for (int i = 0; i < stackDepth; i++) {
         Serial.print(' ');
         Serial.print(stackTrace[i], 16);

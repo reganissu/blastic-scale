@@ -22,19 +22,19 @@ namespace cli {
 
 static void version(WordSplit &) {
   MSerial serial;
-  serial->print(F("version: "));
+  serial->print("version: ");
   serial->println(F(blastic::version));
 }
 
 static void debug(WordSplit &args) {
   MSerial serial;
-  serial->print(F("debug: "));
-  serial->print((blastic::debug = args.nextWordIs("on")) ? F("on\n") : F("off\n"));
+  serial->print("debug: ");
+  serial->print((blastic::debug = args.nextWordIs("on")) ? "on\n" : "off\n");
 }
 
 static void echo(WordSplit &args) {
   MSerial serial;
-  serial->print(F("echo:"));
+  serial->print("echo:");
   for (char *arg = args.nextWord(); arg; arg = args.nextWord()) {
     serial->print(' ');
     serial->print(arg);
@@ -50,7 +50,7 @@ constexpr const uint32_t scaleCliTimeout = 2000, scaleCliMaxMedianWidth = 16;
 static void mode(WordSplit &args) {
   auto modeString = args.nextWord();
   MSerial serial;
-  serial->print(F("scale::mode: "));
+  serial->print("scale::mode: ");
   if (!modeString) {
     serial->print("missing mode argument\n");
     return;
@@ -67,7 +67,7 @@ static void mode(WordSplit &args) {
 static void tare(WordSplit &) {
   auto value = raw(config.scale, scaleCliMaxMedianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
-  serial->print(F("scale::tare: "));
+  serial->print("scale::tare: ");
   if (value == invalidRead) {
     serial->print("failed to get measurements for tare\n");
     return;
@@ -91,7 +91,7 @@ static void calibrate(WordSplit &args) {
   }
   auto value = raw(config.scale, scaleCliMaxMedianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
-  serial->print(F("scale::calibrate: "));
+  serial->print("scale::calibrate: ");
   if (value == invalidRead) {
     serial->print("failed to get measurements for calibration\n");
     return;
@@ -106,8 +106,8 @@ static void raw(WordSplit &args) {
   auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), scaleCliMaxMedianWidth);
   auto value = blastic::scale::raw(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
-  serial->print(F("scale::raw: "));
-  value == invalidRead ? serial->print(F("invalid\n")) : serial->println(value);
+  serial->print("scale::raw: ");
+  value == invalidRead ? serial->print("invalid\n") : serial->println(value);
 }
 
 static void weight(WordSplit &args) {
@@ -120,8 +120,8 @@ static void weight(WordSplit &args) {
   auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), scaleCliMaxMedianWidth);
   auto value = blastic::scale::weight(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
-  serial->print(F("scale::weight: "));
-  value == invalidWeight ? serial->print(F("invalid\n")) : serial->println(value);
+  serial->print("scale::weight: ");
+  value == invalidWeight ? serial->print("invalid\n") : serial->println(value);
 }
 
 } // namespace scale
@@ -140,9 +140,9 @@ static void status(WordSplit &args) {
     modem.noDebug();
   }
   MSerial serial;
-  serial->print(F("wifi::status: status "));
+  serial->print("wifi::status: status ");
   serial->print(status);
-  serial->print(F(" version "));
+  serial->print(" version ");
   serial->println(firmwareVersion);
 }
 
@@ -174,12 +174,12 @@ static void connect(WordSplit &args) {
     auto status = wifi->status();
     if (status != WL_CONNECTED) {
       modem.noDebug();
-      serial->print(F("wifi::connect: connection failed ("));
+      serial->print("wifi::connect: connection failed (");
       serial->print(status);
       serial->println(')');
       return;
     }
-    serial->print(F("wifi::connect: connected\n"));
+    serial->print("wifi::connect: connected\n");
     wifi->BSSID(bssid);
     rssi = wifi->RSSI();
     ip = wifi->localIP(), gateway = wifi->gatewayIP(), dns1 = wifi->dnsIP(0), dns2 = wifi->dnsIP(1);
@@ -187,17 +187,17 @@ static void connect(WordSplit &args) {
   }
 
   MSerial serial;
-  serial->print(F("wifi::connect: bssid "));
+  serial->print("wifi::connect: bssid ");
   for (auto b : bssid) serial->print(b, 16);
-  serial->print(F(" rssi "));
+  serial->print(" rssi ");
   serial->print(rssi);
-  serial->print(F("dBm ip "));
+  serial->print("dBm ip ");
   serial->print(ip);
-  serial->print(F(" gateway "));
+  serial->print(" gateway ");
   serial->print(gateway);
-  serial->print(F(" dns1 "));
+  serial->print(" dns1 ");
   serial->print(dns1);
-  serial->print(F(" dns2 "));
+  serial->print(" dns2 ");
   serial->println(dns2);
 }
 
@@ -227,12 +227,12 @@ void setup() {
     MSerial serial;
     serial->begin(9600);
     while (!*serial);
-    serial->print(F("Booting blastic-scale version "));
+    serial->print("Booting blastic-scale version ");
     serial->println(F(version));
     // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
     static cli::SerialCliTask<Serial, 4096> cli(cli::callbacks);
     static util::StaticTask display(ui::loop, "DisplayTask");
-    serial->print(F("Starting FreeRTOS scheduler.\n"));
+    serial->print("Starting FreeRTOS scheduler.\n");
   }
   vTaskStartScheduler();
 
