@@ -22,16 +22,15 @@ struct [[gnu::packed]] EEPROMConfig {
 };
 
 constexpr const int32_t invalidRead = 0x800000;
-constexpr const float invalidWeight = NAN;
 constexpr const uint32_t minReadDelayMillis = 1000 / 80;
 
 int32_t raw(const EEPROMConfig &config, size_t medianWidth = 1, TickType_t timeout = portMAX_DELAY);
 
 inline float weight(const EEPROMConfig &config, size_t medianWidth = 1, TickType_t timeout = portMAX_DELAY) {
   auto &calibration = config.calibrations[uint8_t(config.mode)];
-  if (calibration.weightRawRead - calibration.tareRawRead == 0) return invalidWeight;
+  if (calibration.weightRawRead - calibration.tareRawRead == 0) return NAN;
   auto value = raw(config, medianWidth, timeout);
-  if (value == invalidRead) return invalidWeight;
+  if (value == invalidRead) return NAN;
   return calibration.weight * float(value - calibration.tareRawRead) /
          float(calibration.weightRawRead - calibration.tareRawRead);
 }

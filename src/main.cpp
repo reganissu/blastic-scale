@@ -121,7 +121,7 @@ static void weight(WordSplit &args) {
   auto value = blastic::scale::weight(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
   serial->print("scale::weight: ");
-  value == invalidWeight ? serial->print("invalid\n") : serial->println(value);
+  isnan(value) ? serial->print("invalid\n") : serial->println(value);
 }
 
 } // namespace scale
