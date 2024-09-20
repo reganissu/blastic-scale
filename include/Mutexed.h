@@ -31,20 +31,18 @@ namespace util {
 template <auto &obj> class Mutexed {
   inline static StaticSemaphore_t buffer;
   inline static SemaphoreHandle_t mutex = xSemaphoreCreateRecursiveMutexStatic(&buffer);
-  const bool _taken;
 
 public:
-  Mutexed(bool take = true) : _taken(take) {
-    if (take) configASSERT(xSemaphoreTakeRecursive(Mutexed::mutex, portMAX_DELAY));
+  Mutexed() {
+    configASSERT(xSemaphoreTakeRecursive(Mutexed::mutex, portMAX_DELAY));
   }
   Mutexed(const Mutexed &) = delete;
   Mutexed &operator=(const Mutexed &) = delete;
   ~Mutexed() {
-    if (_taken) configASSERT(xSemaphoreGiveRecursive(Mutexed::mutex));
+    configASSERT(xSemaphoreGiveRecursive(Mutexed::mutex));
   }
 
   auto operator->() const { return &obj; }
-  bool taken() const { return _taken; }
   decltype(obj) operator*() const { return obj; }
 };
 

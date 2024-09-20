@@ -27,9 +27,12 @@ static void version(WordSplit &) {
 }
 
 static void debug(WordSplit &args) {
+  blastic::debug = args.nextWordIs("on");
+  if (debug) modem.debug(Serial, 2);
+  else modem.noDebug();
   MSerial serial;
   serial->print("debug: ");
-  serial->print((blastic::debug = args.nextWordIs("on")) ? "on\n" : "off\n");
+  serial->print(blastic::debug ? "on\n" : "off\n");
 }
 
 static void echo(WordSplit &args) {
@@ -133,11 +136,8 @@ static void status(WordSplit &args) {
   char firmwareVersion[12];
   {
     MWiFi wifi;
-    MSerial serial(debug);
-    if (serial.taken()) modem.debug(*serial, 2);
     status = wifi->status();
     strncpy(firmwareVersion, wifi->firmwareVersion(), sizeof(firmwareVersion) - 1);
-    modem.noDebug();
   }
   MSerial serial;
   serial->print("wifi::status: status ");
@@ -180,21 +180,18 @@ static void connect(WordSplit &args) {
   IPAddress ip, gateway, dns1, dns2;
   {
     WifiConnection wifi(config);
-    MSerial serial(debug);
-    if (serial.taken()) modem.debug(*serial, 2);
     auto status = wifi->status();
     if (status != WL_CONNECTED) {
-      modem.noDebug();
+      MSerial serial;
       serial->print("wifi::connect: connection failed (");
       serial->print(status);
       serial->println(')');
       return;
     }
-    serial->print("wifi::connect: connected\n");
+    MSerial()->print("wifi::connect: connected\n");
     wifi->BSSID(bssid);
     rssi = wifi->RSSI();
     ip = wifi->localIP(), gateway = wifi->gatewayIP(), dns1 = wifi->dnsIP(0), dns2 = wifi->dnsIP(1);
-    modem.noDebug();
   }
 
   MSerial serial;
