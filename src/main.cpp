@@ -241,4 +241,5 @@ void setup() [[noreturn]] {
   static util::StaticTask display(ui::loop, "DisplayTask");
   Serial.print("Starting FreeRTOS scheduler.\n");
   vTaskStartScheduler();
+  configASSERT(false && "vTaskStartScheduler() should never return");
 }
