@@ -83,9 +83,9 @@ static void calibrate(WordSplit &args) {
     MSerial()->print("scale::calibrate: missing test weight argument\n");
     return;
   }
-  char *end;
-  auto weight = strtof(weightString, &end);
-  if (weightString == end) {
+  char *weightEnd;
+  auto weight = strtof(weightString, &weightEnd);
+  if (weightString == weightEnd) {
     MSerial()->print("scale::calibrate: cannot parse test weight argument\n");
     return;
   }
@@ -144,6 +144,17 @@ static void status(WordSplit &args) {
   serial->print(status);
   serial->print(" version ");
   serial->println(firmwareVersion);
+}
+
+static void timeout(WordSplit &args) {
+  if (auto timeoutString = args.nextWord()) {
+    char *timeoutEnd;
+    auto timeout = strtoul(timeoutString, &timeoutEnd, 10);
+    if (timeoutString != timeoutEnd) config.wifi.timeoutSec = timeout;
+  }
+  MSerial serial;
+  serial->print("wifi::timeout: ");
+  serial->println(config.wifi.timeoutSec);
 }
 
 static void connect(WordSplit &args) {
@@ -219,22 +230,18 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
 
 } // namespace blastic
 
-void setup() {
+void setup() [[noreturn]] {
   using namespace blastic;
   // some gracetime to start `platformio device monitor` after upload or power on
   delay(1000);
-  {
-    MSerial serial;
-    serial->begin(9600);
-    while (!*serial);
-    serial->print("Booting blastic-scale version ");
-    serial->println(F(version));
-    // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
-    static cli::SerialCliTask<Serial, 4096> cli(cli::callbacks);
-    static util::StaticTask display(ui::loop, "DisplayTask");
-    serial->print("Starting FreeRTOS scheduler.\n");
-  }
+  // XXX do not use FreeRTOS functions other than allocating tasks, crashes seen otherwise
+  Serial.begin(9600);
+  while (!Serial);
+  Serial.print("Booting blastic-scale version ");
+  Serial.println(F(version));
+  // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
+  static cli::SerialCliTask<Serial, 4096> cli(cli::callbacks);
+  static util::StaticTask display(ui::loop, "DisplayTask");
+  Serial.print("Starting FreeRTOS scheduler.\n");
   vTaskStartScheduler();
-
-  for (;;);
 }

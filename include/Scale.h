@@ -24,8 +24,17 @@ struct [[gnu::packed]] EEPROMConfig {
 constexpr const int32_t invalidRead = 0x800000;
 constexpr const uint32_t minReadDelayMillis = 1000 / 80;
 
+/*
+  Read a raw value from HX711. Can run multiple measurements and get the median.
+
+  This function switches on and back off the controller. The execution is
+  also protected by a global mutex.
+*/
 int32_t raw(const EEPROMConfig &config, size_t medianWidth = 1, TickType_t timeout = portMAX_DELAY);
 
+/*
+  As above, but return a computed weight using calibration data.
+*/
 inline float weight(const EEPROMConfig &config, size_t medianWidth = 1, TickType_t timeout = portMAX_DELAY) {
   auto &calibration = config.calibrations[uint8_t(config.mode)];
   if (calibration.weightRawRead - calibration.tareRawRead == 0) return NAN;

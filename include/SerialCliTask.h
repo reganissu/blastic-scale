@@ -128,7 +128,15 @@ public:
   This CLI task runs with the highest priority available, in order to be able to work
   even when other tasks hang for any reason.
 
-  This class is a template in order to use util::Mutexed<serial>.
+  This class is a template in order to use util::Mutexed<serial>. Note however that
+  mutexed access is used only when printing error messages from the callback parsing function.
+  Access in read to the serial does *not* use locking, as we assume that we are the only
+  client reading serial.
+
+  This class also changes the timeout of the Serial device, in order to avoid blocking
+  reads, which would slow down the device as this task runs with the maximum priority.
+  This is done to enable the execution of debug command via serial in a timely manner,
+  regardless of the other tasks' state.
 */
 
 template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)>
@@ -148,7 +156,7 @@ public:
       tasks in blocking read operations. Polling with task delays is
       handled in loop().
     */
-    MSerial()->setTimeout(0);
+    serial.setTimeout(0);
   }
 
 private:
@@ -167,7 +175,7 @@ private:
     */
     constexpr const size_t maxLen = std::min(255, SERIAL_BUFFER_SIZE - 1);
     char serialInput[maxLen + 1];
-    static size_t len = 0;
+    size_t len = 0;
     // polling loop
     while (true) {
       auto oldLen = len;
