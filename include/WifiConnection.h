@@ -21,7 +21,7 @@ public:
   struct [[gnu::packed]] EEPROMConfig {
     // leave the password empty to connect to an open network
     char ssid[32], password[64];
-    unsigned long timeoutSec;
+    unsigned long dhcpTimeout, disconnectTimeout;
   };
 
   WifiConnection(const EEPROMConfig &config);

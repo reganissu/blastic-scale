@@ -14,7 +14,7 @@ EEPROMConfig config = {.scale = {.dataPin = 2,
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
                        // XXX GCC bug, cannot use initializer lists with strings
-                       .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10}};
+                       .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10, 10}};
 
 bool debug = false;
 
@@ -150,11 +150,11 @@ static void timeout(WordSplit &args) {
   if (auto timeoutString = args.nextWord()) {
     char *timeoutEnd;
     auto timeout = strtoul(timeoutString, &timeoutEnd, 10);
-    if (timeoutString != timeoutEnd) config.wifi.timeoutSec = timeout;
+    if (timeoutString != timeoutEnd) config.wifi.disconnectTimeout = timeout;
   }
   MSerial serial;
   serial->print("wifi::timeout: ");
-  serial->println(config.wifi.timeoutSec);
+  serial->println(config.wifi.disconnectTimeout);
 }
 
 static void connect(WordSplit &args) {
