@@ -23,7 +23,7 @@ namespace cli {
 static void version(WordSplit &) {
   MSerial serial;
   serial->print("version: ");
-  serial->println(F(blastic::version));
+  serial->println(blastic::version);
 }
 
 static void debug(WordSplit &args) {
@@ -232,10 +232,10 @@ void setup() [[noreturn]] {
   // some gracetime to start `platformio device monitor` after upload or power on
   delay(1000);
   // XXX do not use FreeRTOS functions other than allocating tasks, crashes seen otherwise
-  Serial.begin(9600);
+  Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
   Serial.print("Booting blastic-scale version ");
-  Serial.println(F(version));
+  Serial.println(version);
   // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
   static cli::SerialCliTask<Serial, 4096> cli(cli::callbacks);
   static util::StaticTask display(ui::loop, "DisplayTask");

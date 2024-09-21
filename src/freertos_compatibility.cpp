@@ -69,7 +69,7 @@ extern "C" void __wrap___assert_func(const char *file, int line, const char *, c
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
       vTaskPrioritySet(nullptr, tskIDLE_PRIORITY);
       MSerial serial;
-      if (!*serial) serial->begin(9600);
+      if (!*serial) serial->begin(BLASTIC_MONITOR_SPEED);
       while (!*serial);
       vTaskPrioritySet(nullptr, configMAX_PRIORITIES - 1);
       serial->print("assert: ");
@@ -86,7 +86,7 @@ extern "C" void __wrap___assert_func(const char *file, int line, const char *, c
       serial->println();
       vTaskDelay(pdMS_TO_TICKS(sleepMillis));
     } else {
-      if (!Serial) Serial.begin(9600);
+      if (!Serial) Serial.begin(BLASTIC_MONITOR_SPEED);
       while (!Serial);
       Serial.print("assert: ");
       Serial.print(file);

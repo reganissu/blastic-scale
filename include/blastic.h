@@ -1,6 +1,10 @@
 #ifndef _HEADER_blastic
 #define _HEADER_blastic
 
+#ifndef BLASTIC_MONITOR_SPEED
+#error Define the serial baud rate in BLASTIC_MONITOR_SPEED
+#endif
+
 // environment
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
