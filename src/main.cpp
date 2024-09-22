@@ -1,5 +1,6 @@
 #include <iterator>
 #include "blastic.h"
+#include "WiFiSSLClient.h"
 #include "SerialCliTask.h"
 
 namespace blastic {
@@ -227,6 +228,106 @@ static void connect(WordSplit &) {
 
 } // namespace wifi
 
+namespace tls {
+
+constexpr const uint16_t defaultTlsPort = 443;
+
+static void ping(WordSplit &args) {
+  auto address = args.nextWord();
+  if (!address) {
+    MSerial()->print("tls::ping: failed to parse address\n");
+    return;
+  }
+  if (WifiConnection::ipConnectBroken) {
+    IPAddress ip;
+    if (ip.fromString(address)) {
+      MSerial()->print("tls::ping: tls validation is broken as of firmware version " WIFI_FIRMWARE_LATEST_VERSION
+                       " for direct to IP connections\n");
+      return;
+    }
+  }
+  auto portString = args.nextWord();
+  char *portEnd;
+  auto port = strtoul(portString, &portEnd, 10);
+  if (portString == portEnd) port = defaultTlsPort;
+  if (!port || port > uint16_t(-1)) {
+    MSerial()->print("tls::ping: invalid port\n");
+    return;
+  }
+  WifiConnection wifi(config.wifi);
+  if (!wifi) {
+    MSerial()->print("tls::ping: failed to connect to wifi\n");
+    return;
+  }
+  MSerial()->print("tls::ping: connected to wifi\n");
+
+  {
+    WiFiSSLClient client;
+    if (!client.connect(address, port)) {
+      MSerial()->print("tls::ping: failed to connect to server\n");
+      return;
+    }
+    MSerial()->print("tls::ping: connected to server\n");
+
+    for (auto word = args.nextWord(); word;) {
+      if (!client.print(' ') || !client.print(word)) goto sendError;
+      if (!(word = args.nextWord())) {
+        if (!client.println()) goto sendError;
+        break;
+      }
+      continue;
+    sendError:
+      MSerial()->print("tls::ping: failed to write all the data\n");
+      return;
+    }
+    MSerial()->print("tls::ping: send complete, waiting for response\n");
+
+    constexpr const size_t maxLen = std::min(255, SERIAL_BUFFER_SIZE - 1);
+    uint8_t tlsInput[maxLen];
+    // XXX TODO time period is broken, this below counts as 10ms
+    constexpr const unsigned int waitingReadInterval = 100;
+    /*
+      XXX TODO using read() if the sslclient is not connected (FIN/RST received) on
+      the esp32s3 causes a fault (probably abort() is called): doing so, it appears
+      to print debug data to the Serial input, and it may or may not reset the renesas
+      chip, causing undebuggable chaos.
+
+      All the Arduino examples, which work in a single-thread environment, show a busy
+      loop read:
+
+      while (client.connected()) {  // sends _SSLCLIENTCONNECTED request and waits
+                                    // BUG esp32s3 could receive and handle a connection close here!
+        client.read(...);           // sends _SSLCLIENTRECEIVE request and waits
+        // parse...
+      }
+
+      That means that *almost always* you are catching the closed connection state
+      before attempting a read, so no crash occur. However, it is impossible to make
+      this safe, because the esp32s3 runs independently of the renesas, and it may
+      as well process a connection close event in the middle.
+      Under FreeRTOS, this is more evident because the polling loop below sleeps for
+      some time after receiving no data (read() == 0).
+
+      For now keep close the connected() and read() call. We cannot even make this a
+      critical section, as UART input requires interrupts...
+
+    */
+    while (client.connected()) {
+      // this is non blocking as the underlying code may return zero (and available() == 0) while still being connected
+      auto len = client.read(tlsInput, maxLen);
+      if (!len) {
+        vTaskDelay(pdMS_TO_TICKS(waitingReadInterval));
+        continue;
+      }
+      MSerial()->write(tlsInput, len);
+    }
+  }
+
+  MSerial()->print("\ntls::ping: connection closed\n");
+}
+
+} // namespace tls
+
 static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(uptime),
                                                makeCliCallback(debug),
@@ -239,6 +340,7 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(wifi::status),
                                                makeCliCallback(wifi::configure),
                                                makeCliCallback(wifi::connect),
+                                               makeCliCallback(tls::ping),
                                                CliCallback()};
 
 } // namespace cli

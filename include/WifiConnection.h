@@ -18,6 +18,8 @@ namespace blastic {
 
 class WifiConnection : public util::Mutexed<WiFi> {
 public:
+  static const bool ipConnectBroken;
+
   struct [[gnu::packed]] EEPROMConfig {
     // leave the password empty to connect to an open network
     char ssid[32], password[64];

@@ -3,6 +3,8 @@
 
 namespace blastic {
 
+const bool WifiConnection::ipConnectBroken = strcmp(WIFI_FIRMWARE_LATEST_VERSION, "0.4.2") <= 0;
+
 static unsigned long lastUnusedTime = 0, disconnectTimeout = 0;
 
 static void timeoutDisconnect() {
