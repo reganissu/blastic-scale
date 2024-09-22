@@ -57,6 +57,23 @@ extern "C" void __wrap___malloc_lock(_reent *) { vTaskSuspendAll(); }
 extern "C" void __real___malloc_unlock(_reent *);
 extern "C" void __wrap___malloc_unlock(_reent *) { xTaskResumeAll(); }
 
+#if configUSE_MALLOC_FAILED_HOOK
+
+/*
+  Trace all failed allocations.
+*/
+
+void vApplicationMallocFailedHook() { configASSERT(false && "pvPortMalloc() failed"); }
+
+extern "C" void *__real__malloc_r(struct _reent *, size_t);
+extern "C" void *__wrap__malloc_r(struct _reent *r, size_t s) {
+  auto ptr = __real__malloc_r(r, s);
+  configASSERT(ptr && "_malloc_r() failed");
+  return ptr;
+}
+
+#endif
+
 /*
   Hook failed assert to a Serial print, then throw a stack trace every 10 seconds.
 */
