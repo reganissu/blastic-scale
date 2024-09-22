@@ -39,5 +39,10 @@ tls::ping <ip>.nip.io 8443 [data...]
 Note that currently certificate validation is broken on the Arduino UNO R4 WiFi for an IP (non DNS) address!
 
 EOF
-trap 'cat socat-mitmproxy-keylog.txt.* >> socat-mitmproxy-keylog.txt' EXIT
+function cleanup {
+  shopt -s nullglob
+  cat - socat-mitmproxy-keylog.txt.* < /dev/null | grep -Ev '^ *#' >> socat-mitmproxy-keylog.txt
+  rm -f socat-mitmproxy-keylog.txt.*
+}
+trap cleanup EXIT
 LD_PRELOAD="$(realpath openssl-keylog/libsslkeylog.so)" SSLKEYLOGFILE=socat-mitmproxy-keylog.txt socat -d -d openssl-listen:8443,cert=socat-mitmproxy.pem,verify=0,fork -
