@@ -26,9 +26,23 @@ static void version(WordSplit &) {
   serial->println(blastic::version);
 }
 
+static void uptime(WordSplit &) {
+  auto s = millis() / 1000;
+  MSerial serial;
+  serial->print("uptime: ");
+  serial->print(s / 60 / 60 / 24);
+  serial->print('d');
+  serial->print(s / 60 / 60);
+  serial->print('h');
+  serial->print(s / 60);
+  serial->print('m');
+  serial->print(s);
+  serial->print("s\n");
+}
+
 static void debug(WordSplit &args) {
   blastic::debug = args.nextWordIs("on");
-  if (debug) modem.debug(Serial, 2);
+  if (blastic::debug) modem.debug(Serial, 2);
   else modem.noDebug();
   MSerial serial;
   serial->print("debug: ");
@@ -157,29 +171,31 @@ static void timeout(WordSplit &args) {
   serial->println(config.wifi.disconnectTimeout);
 }
 
-static void connect(WordSplit &args) {
+static void configure(WordSplit &args) {
   auto ssid = args.nextWord();
-  auto password = args.nextWord();
   if (!ssid) {
-    MSerial()->print("wifi::connect: missing ssid argument\n");
+    MSerial()->print("wifi::configure: missing ssid argument");
     return;
   }
-  WifiConnection::EEPROMConfig config = blastic::config.wifi;
-  strncpy(config.ssid, ssid, sizeof(config.ssid) - 1);
-  if (password) strncpy(config.password, password, sizeof(config.password) - 1);
-  else config.password[0] = '\0';
-
-  {
-    MSerial serial;
-    serial->print("wifi::connect: begin connection to ");
-    serial->println(config.ssid);
+  strncpy(config.wifi.ssid, ssid, sizeof(config.wifi.ssid) - 1);
+  if (auto password = args.nextWord()) strncpy(config.wifi.password, password, sizeof(config.wifi.password) - 1);
+  else memset(config.wifi.password, 0, sizeof(config.wifi.password));
+  MSerial serial;
+  serial->print("wifi::configure: set ssid ");
+  serial->print(config.wifi.ssid);
+  if (strlen(config.wifi.password)) {
+    serial->print(" password ");
+    serial->print(config.wifi.password);
   }
+  serial->println();
+}
 
+static void connect(WordSplit &) {
   uint8_t bssid[6];
   int32_t rssi;
   IPAddress ip, gateway, dns1, dns2;
   {
-    WifiConnection wifi(config);
+    WifiConnection wifi(config.wifi);
     auto status = wifi->status();
     if (status != WL_CONNECTED) {
       MSerial serial;
@@ -212,6 +228,7 @@ static void connect(WordSplit &args) {
 } // namespace wifi
 
 static constexpr const CliCallback callbacks[]{makeCliCallback(version),
+                                               makeCliCallback(uptime),
                                                makeCliCallback(debug),
                                                makeCliCallback(echo),
                                                makeCliCallback(scale::mode),
@@ -220,6 +237,7 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(scale::raw),
                                                makeCliCallback(scale::weight),
                                                makeCliCallback(wifi::status),
+                                               makeCliCallback(wifi::configure),
                                                makeCliCallback(wifi::connect),
                                                CliCallback()};
 
@@ -237,7 +255,7 @@ void setup() [[noreturn]] {
   Serial.print("Booting blastic-scale version ");
   Serial.println(version);
   // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
-  static cli::SerialCliTask<Serial, 4096> cli(cli::callbacks);
+  static cli::SerialCliTask<Serial, 4 * 1024> cli(cli::callbacks);
   static util::StaticTask display(ui::loop, "DisplayTask");
   Serial.print("Starting FreeRTOS scheduler.\n");
   vTaskStartScheduler();
