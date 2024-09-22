@@ -1,0 +1,3 @@
+[submodule "scripts/openssl-keylog"]
+	path = scripts/openssl-keylog
+	url = git@github.com:wpbrown/openssl-keylog.git
