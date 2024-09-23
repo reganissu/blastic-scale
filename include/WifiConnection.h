@@ -1,5 +1,4 @@
-#ifndef _HEADER_wifi
-#define _HEADER_wifi
+#pragma once
 
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
@@ -43,5 +42,3 @@ public:
 };
 
 } // namespace blastic
-
-#endif

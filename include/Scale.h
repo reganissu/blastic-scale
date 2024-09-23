@@ -1,5 +1,4 @@
-#ifndef _HEADER_Scale
-#define _HEADER_Scale
+#pragma once
 
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
@@ -47,5 +46,3 @@ inline float weight(const EEPROMConfig &config, size_t medianWidth = 1, TickType
 } // namespace scale
 
 } // namespace blastic
-
-#endif

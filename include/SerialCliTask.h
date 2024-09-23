@@ -1,5 +1,4 @@
-#ifndef _HEADER_SerialCliTask
-#define _HEADER_SerialCliTask
+#pragma once
 
 #include <algorithm>
 #include <Arduino.h>
@@ -233,5 +232,3 @@ private:
 } // namespace cli
 
 } // namespace blastic
-
-#endif

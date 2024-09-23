@@ -1,5 +1,4 @@
-#ifndef _HEADER_Mutexed
-#define _HEADER_Mutexed
+#pragma once
 
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
@@ -47,5 +46,3 @@ public:
 };
 
 } // namespace util
-
-#endif

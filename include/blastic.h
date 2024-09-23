@@ -1,5 +1,4 @@
-#ifndef _HEADER_blastic
-#define _HEADER_blastic
+#pragma once
 
 #ifndef BLASTIC_MONITOR_SPEED
 #error Define the serial baud rate in BLASTIC_MONITOR_SPEED
@@ -31,5 +30,3 @@ using MSerial = util::Mutexed<::Serial>;
 using MWiFi = util::Mutexed<::WiFi>;
 
 } // namespace blastic
-
-#endif
