@@ -34,8 +34,24 @@ WifiConnection::WifiConnection(const EEPROMConfig &config) : util::Mutexed<WiFi>
 
 WifiConnection::operator bool() const {
   auto &_this = *this;
-  return _this->status() == WL_CONNECTED && _this->localIP() &&  _this->gatewayIP();
- }
+  return _this->status() == WL_CONNECTED && _this->localIP() && _this->gatewayIP();
+}
+
+int WiFiSSLClient::read() {
+  vTaskSuspendAll();
+  int result = -1;
+  if (connected()) result = ::WiFiSSLClient::read();
+  xTaskResumeAll();
+  return result;
+}
+
+int WiFiSSLClient::read(uint8_t *buf, size_t size) {
+  vTaskSuspendAll();
+  int result = -1;
+  if (connected()) result = ::WiFiSSLClient::read(buf, size);
+  xTaskResumeAll();
+  return result;
+}
 
 WifiConnection::~WifiConnection() {
   lastUnusedTime = millis();

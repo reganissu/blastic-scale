@@ -286,35 +286,10 @@ static void ping(WordSplit &args) {
     uint8_t tlsInput[maxLen];
     // XXX TODO time period is broken, this below counts as 10ms
     constexpr const unsigned int waitingReadInterval = 100;
-    /*
-      XXX TODO using read() if the sslclient is not connected (FIN/RST received) on
-      the esp32s3 causes a fault (probably abort() is called): doing so, it appears
-      to print debug data to the Serial input, and it may or may not reset the renesas
-      chip, causing undebuggable chaos.
-
-      All the Arduino examples, which work in a single-thread environment, show a busy
-      loop read:
-
-      while (client.connected()) {  // sends _SSLCLIENTCONNECTED request and waits
-                                    // BUG esp32s3 could receive and handle a connection close here!
-        client.read(...);           // sends _SSLCLIENTRECEIVE request and waits
-        // parse...
-      }
-
-      That means that *almost always* you are catching the closed connection state
-      before attempting a read, so no crash occur. However, it is impossible to make
-      this safe, because the esp32s3 runs independently of the renesas, and it may
-      as well process a connection close event in the middle.
-      Under FreeRTOS, this is more evident because the polling loop below sleeps for
-      some time after receiving no data (read() == 0).
-
-      For now keep close the connected() and read() call. We cannot even make this a
-      critical section, as UART input requires interrupts...
-
-    */
-    while (client.connected()) {
+    while (true) {
       // this is non blocking as the underlying code may return zero (and available() == 0) while still being connected
       auto len = client.read(tlsInput, maxLen);
+      if (len < 0) break;
       if (!len) {
         vTaskDelay(pdMS_TO_TICKS(waitingReadInterval));
         continue;
@@ -349,8 +324,6 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
 
 void setup() [[noreturn]] {
   using namespace blastic;
-  // some gracetime to start `platformio device monitor` after upload or power on
-  delay(1000);
   // XXX do not use FreeRTOS functions other than allocating tasks, crashes seen otherwise
   Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
