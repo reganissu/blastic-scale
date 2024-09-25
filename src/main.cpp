@@ -11,7 +11,9 @@ static constexpr const char version[] = {GIT_COMMIT " worktree " GIT_WORKTREE_ST
 EEPROMConfig config = {.scale = {.dataPin = 2,
                                  .clockPin = 3,
                                  .mode = scale::HX711Mode::A128,
-                                 .calibrations = {{.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
+                                 .calibrations = {{.tareRawRead = 45527,
+                                                   .weightRawRead = 114810,
+                                                   .weight = 1.56}, // works for me, but not for thee
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
                        // XXX GCC bug, cannot use initializer lists with strings
