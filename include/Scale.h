@@ -1,8 +1,10 @@
 #pragma once
 
+#include <tuple>
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 #include "AnnotatedFloat.h"
+#include "murmur32.h"
 
 namespace blastic {
 
@@ -23,9 +25,15 @@ struct [[gnu::packed]] EEPROMConfig {
   auto &getCalibration() const { return calibrations[uint8_t(mode)]; }
 };
 
+#define makeModeHash(m) std::make_tuple(util::murmur3_32(#m), HX711Mode::m)
+static constexpr const std::tuple<uint32_t, HX711Mode> modeHashes[]{makeModeHash(A128), makeModeHash(B),
+                                                                    makeModeHash(A64)};
+#define makeModeString(m) #m
+static constexpr const char *modeStrings[]{makeModeString(A128), makeModeString(B), makeModeString(A64)};
+
 constexpr const int32_t readErr = 0x800000;
 constexpr const util::AnnotatedFloat weightCal = util::AnnotatedFloat("cal"), weightErr = util::AnnotatedFloat("err");
-constexpr const uint32_t minReadDelayMillis = 1000 / 80;  // max output rate is 80Hz
+constexpr const uint32_t minReadDelayMillis = 1000 / 80; // max output rate is 80Hz
 
 /*
   Read a raw value from HX711. Can run multiple measurements and get the median.

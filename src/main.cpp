@@ -1,5 +1,4 @@
 #include <iterator>
-#include <tuple>
 #include "blastic.h"
 #include "WiFiSSLClient.h"
 #include "SerialCliTask.h"
@@ -71,9 +70,6 @@ using namespace blastic::scale;
 
 constexpr const uint32_t scaleCliTimeout = 2000, scaleCliMaxMedianWidth = 16;
 
-#define makeMode(m) std::make_tuple(util::murmur3_32(#m), HX711Mode::m)
-static constexpr const std::tuple<uint32_t, HX711Mode> modes[]{makeMode(A128), makeMode(B), makeMode(A64)};
-
 static void mode(WordSplit &args) {
   auto modeStr = args.nextWord();
   if (!modeStr) {
@@ -81,7 +77,7 @@ static void mode(WordSplit &args) {
     return;
   }
   auto hash = util::murmur3_32(modeStr);
-  for (auto mode : modes) {
+  for (auto mode : modeHashes) {
     if (std::get<uint32_t>(mode) != hash) continue;
     config.scale.mode = std::get<HX711Mode>(mode);
     MSerial serial;
@@ -127,6 +123,20 @@ static void calibrate(WordSplit &args) {
   MSerial serial;
   serial->print("scale::calibrate: set to raw read value ");
   serial->println(value);
+}
+
+static void configuration(WordSplit &) {
+  auto modeString = modeStrings[uint32_t(config.scale.mode)];
+  auto &calibration = config.scale.getCalibration();
+  MSerial serial;
+  serial->print("scale::configuration: mode ");
+  serial->print(modeString);
+  serial->print(" tareRawRead weightRawRead weight ");
+  serial->print(calibration.tareRawRead);
+  serial->print(' ');
+  serial->print(calibration.weightRawRead);
+  serial->print(' ');
+  serial->println(calibration.weight);
 }
 
 static void raw(WordSplit &args) {
@@ -317,6 +327,7 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(scale::mode),
                                                makeCliCallback(scale::tare),
                                                makeCliCallback(scale::calibrate),
+                                               makeCliCallback(scale::configuration),
                                                makeCliCallback(scale::raw),
                                                makeCliCallback(scale::weight),
                                                makeCliCallback(wifi::status),
