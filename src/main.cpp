@@ -354,11 +354,11 @@ void setup() [[noreturn]] {
   using namespace blastic;
   Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
-  Serial.print("Booting blastic-scale version ");
+  Serial.print("setup: booting blastic-scale version ");
   Serial.println(version);
   submitter();
   cliTask();
-  Serial.print("Starting FreeRTOS scheduler.\n");
+  Serial.print("setup: starting FreeRTOS scheduler\n");
   vTaskStartScheduler();
   configASSERT(false && "vTaskStartScheduler() should never return");
 }

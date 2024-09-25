@@ -38,7 +38,7 @@ void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator
       auto lineEnd = strchr(serialInput, '\n');
       if (!lineEnd) {
         if (len == maxLen) {
-          outputMutexGen.lock()->print("Buffer overflow while reading input!\n");
+          outputMutexGen.lock()->print("cli: buffer overflow while reading input\n");
           // discard buffer
           len = 0;
         }
@@ -59,9 +59,8 @@ void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator
         }
       {
         auto output = outputMutexGen.lock();
-        output->print("Command ");
-        output->print(command);
-        output->print(" not found.\n");
+        output->print("cli: command not found :");
+        output->println(command);
       }
       // move bytes after newline to start of buffer, repeat
     shiftLeftBuffer:
