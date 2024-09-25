@@ -350,7 +350,7 @@ static SerialCliTask &cliTask() {
 
 } // namespace blastic
 
-void setup() [[noreturn]] {
+void setup() {
   using namespace blastic;
   Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
@@ -358,7 +358,5 @@ void setup() [[noreturn]] {
   Serial.println(version);
   submitter();
   cliTask();
-  Serial.print("setup: starting FreeRTOS scheduler\n");
-  vTaskStartScheduler();
-  configASSERT(false && "vTaskStartScheduler() should never return");
+  Serial.println("setup: done\n");
 }

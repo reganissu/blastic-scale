@@ -122,5 +122,8 @@ extern "C" void __wrap___assert_func(const char *file, int line, const char *, c
   }
 }
 
-// empty loop, necessary for linking purposes but never run
-void loop() { reinterpret_cast<voidFuncPtr>(0)(); }
+void loop() [[noreturn]] {
+  Serial.print("setup: starting FreeRTOS scheduler\n");
+  vTaskStartScheduler();
+  configASSERT(false && "vTaskStartScheduler() should never return");
+}
