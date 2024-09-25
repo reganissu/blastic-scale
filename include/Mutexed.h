@@ -30,19 +30,45 @@ namespace util {
 template <auto &obj> class Mutexed {
   inline static StaticSemaphore_t buffer;
   inline static SemaphoreHandle_t mutex = xSemaphoreCreateRecursiveMutexStatic(&buffer);
+  template <typename T> friend class MutexedGenerator;
 
 public:
-  Mutexed() {
-    configASSERT(xSemaphoreTakeRecursive(Mutexed::mutex, portMAX_DELAY));
-  }
+  Mutexed() { configASSERT(xSemaphoreTakeRecursive(Mutexed::mutex, portMAX_DELAY)); }
   Mutexed(const Mutexed &) = delete;
   Mutexed &operator=(const Mutexed &) = delete;
-  ~Mutexed() {
-    configASSERT(xSemaphoreGiveRecursive(Mutexed::mutex));
-  }
+  ~Mutexed() { configASSERT(xSemaphoreGiveRecursive(Mutexed::mutex)); }
 
   auto operator->() const { return &obj; }
-  decltype(obj) operator*() const { return obj; }
+  auto &operator*() const { return obj; }
+};
+
+template <typename T> class MutexedGenerator {
+  T &obj;
+  SemaphoreHandle_t &mutex;
+
+  MutexedGenerator(T &obj, SemaphoreHandle_t &mutex) : obj(obj), mutex(mutex) {}
+
+public:
+  template <auto &obj> static MutexedGenerator get() { return MutexedGenerator(obj, Mutexed<obj>::mutex); }
+
+  class MutexedDynamic {
+    const MutexedGenerator &generator;
+    MutexedDynamic(const MutexedGenerator &generator) : generator(generator) {
+      configASSERT(xSemaphoreTakeRecursive(generator.mutex, portMAX_DELAY));
+    }
+    friend class MutexedGenerator;
+
+  public:
+    MutexedDynamic() = delete;
+    MutexedDynamic(const MutexedDynamic &) = delete;
+    MutexedDynamic &operator=(const MutexedDynamic &) = delete;
+    ~MutexedDynamic() { configASSERT(xSemaphoreGiveRecursive(generator.mutex)); }
+
+    T *operator->() const { return &generator.obj; }
+    T &operator*() const { return generator.obj; }
+  };
+
+  MutexedDynamic lock() const { return MutexedDynamic(*this); }
 };
 
 } // namespace util
