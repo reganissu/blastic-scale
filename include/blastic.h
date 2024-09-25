@@ -12,7 +12,6 @@
 // classes / task functions for devices
 #include "Scale.h"
 #include "WifiConnection.h"
-#include "Display.h"
 
 namespace blastic {
 

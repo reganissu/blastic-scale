@@ -5,12 +5,18 @@
 #include <Arduino_FreeRTOS.h>
 #include "Mutexed.h"
 #include "StaticTask.h"
-
-namespace blastic {
+#include "murmur32.h"
 
 namespace cli {
 
 class WordSplit;
+class CliCallback;
+
+namespace details {
+
+void loop(const CliCallback *const callbacks, Stream &input, util::MutexedGenerator<Print> outputMutexGen);
+
+}
 
 /*
   A CliCallback struct contains the MurMur3 hash of the command string, and
@@ -28,44 +34,13 @@ public:
   constexpr CliCallback() : cliCommandHash(0), function(nullptr) {}
 
   constexpr CliCallback(const char *str, CliFunctionPointer function)
-      : cliCommandHash(murmur3_32(str)), function(function) {}
-
-  // Reference: https://en.wikipedia.org/wiki/MurmurHash#Algorithm
-  constexpr static uint32_t murmur3_32(const char *const str) {
-    uint32_t h = 0xfaa7c96c, len = CliCallback::strlen(str), dwordLen = len & ~uint32_t(3),
-             leftoverBytes = len & uint32_t(3);
-    for (uint32_t i = 0; i < dwordLen; i += 4) {
-      uint32_t dword = 0;
-      for (uint32_t j = 0; j < 4; j++) dword |= str[i + j] << j * 8;
-      h ^= murmur3_32_scramble(dword);
-      h = (h << 13) | (h >> 19);
-      h = h * 5 + 0xe6546b64;
-    }
-    uint32_t partialDword = 0;
-    for (uint32_t i = 0; i < leftoverBytes; i++) partialDword |= str[dwordLen + i] << i * 8;
-    h ^= murmur3_32_scramble(partialDword);
-    h ^= len;
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-    return h;
-  }
+      : cliCommandHash(util::murmur3_32(str)), function(function) {}
 
 private:
+  friend void details::loop(const CliCallback *const callbacks, Stream &input, util::MutexedGenerator<Print> outputMutexGen);
+
   const uint32_t cliCommandHash;
   const CliFunctionPointer function;
-
-  // constexpr strlen
-  constexpr static uint32_t strlen(const char *const str) { return str[0] ? 1 + CliCallback::strlen(str + 1) : 0; }
-
-  constexpr static uint32_t murmur3_32_scramble(uint32_t dword) {
-    dword *= 0xcc9e2d51;
-    dword = (dword << 15) | (dword >> 17);
-    dword *= 0x1b873593;
-    return dword;
-  }
 
   template <auto &, size_t> friend class SerialCliTask;
 };
@@ -138,17 +113,15 @@ public:
   regardless of the other tasks' state.
 */
 
-template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)>
-class SerialCliTask : public util::StaticTask<StackSize> {
+template <auto &serial, size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class SerialCliTask {
 
 public:
-  // task delay in poll loop, milliseconds
-  static constexpr const int32_t pollInterval = 250;
+  using MSerial = util::Mutexed<serial>;
 
   // Note: the serial must be initialized alreay
-  SerialCliTask(const CliCallback *callbacks)
-      : util::StaticTask<StackSize>(SerialCliTask::loop, this, "SerialCliTask", configMAX_PRIORITIES - 1),
-        callbacks(callbacks) {
+  SerialCliTask(const CliCallback *callbacks, const char *name = "SerialCliTask",
+                UBaseType_t priority = configMAX_PRIORITIES - 1)
+      : callbacks(callbacks), task(SerialCliTask::loop, this, name, priority) {
     /*
       Read operations busy poll using millis(). This task
       runs with the maximum priority, so we must not starve the other
@@ -159,76 +132,13 @@ public:
   }
 
 private:
-  const CliCallback *callbacks;
+  const CliCallback *const callbacks;
+  util::StaticTask<StackSize> task;
 
-  static void loop(void *_this) { reinterpret_cast<SerialCliTask *>(_this)->loop(); }
-  void loop() {
-    /*
-      Avoid String usage at all costs because it uses realloc(),
-      shoot in your foot with pointer arithmetic.
-
-      This function reads serial input into a static buffer, and
-      parses a command line per '\n'-terminated line of input.
-
-      Command names are trimmed by WordSplit.
-    */
-    constexpr const size_t maxLen = std::min(255, SERIAL_BUFFER_SIZE - 1);
-    char serialInput[maxLen + 1];
-    size_t len = 0;
-    // polling loop
-    while (true) {
-      auto oldLen = len;
-      // this is non blocking as we used setTimeout(0) on initialization
-      len += serial.readBytes(serialInput + len, maxLen - len);
-      if (oldLen == len) {
-        vTaskDelay(pdMS_TO_TICKS(pollInterval));
-        continue;
-      }
-      // input may contain the null character, sanitize to a newline
-      for (auto c = serialInput + oldLen; c < serialInput + len; c++) *c = *c ?: '\n';
-      // make sure this is always a valid C string
-      serialInput[len] = '\0';
-      // parse loop
-      while (true) {
-        auto lineEnd = strchr(serialInput, '\n');
-        if (!lineEnd) {
-          if (len == maxLen) {
-            MSerial()->print("Buffer overflow while reading serial input!\n");
-            // discard buffer
-            len = 0;
-          }
-          break;
-        }
-        // truncate the command line C string at '\n'
-        *lineEnd = '\0';
-        WordSplit commandLine(serialInput);
-        auto command = commandLine.nextWord();
-        uint32_t commandHash;
-        // skip if line is empty
-        if (!command || !*command) goto shiftLeftBuffer;
-        commandHash = CliCallback::murmur3_32(command);
-        for (auto callback = callbacks; callback->function; callback++)
-          if (callback->cliCommandHash == commandHash) {
-            callback->function(commandLine);
-            goto shiftLeftBuffer;
-          }
-        {
-          MSerial mserial;
-          mserial->print("Command ");
-          mserial->print(command);
-          mserial->print(" not found.\n");
-        }
-        // move bytes after newline to start of buffer, repeat
-      shiftLeftBuffer:
-        auto nextLine = lineEnd + 1;
-        auto leftoverLen = len - (nextLine - serialInput);
-        memmove(serialInput, nextLine, leftoverLen);
-        len = leftoverLen;
-      }
-    }
+  static void loop(void *_this) {
+    auto &me = *reinterpret_cast<SerialCliTask *>(_this);
+    details::loop(me.callbacks, serial, util::MutexedGenerator<Print>::get<serial>());
   }
 };
 
 } // namespace cli
-
-} // namespace blastic

@@ -1,4 +1,5 @@
 #include <iterator>
+#include <tuple>
 #include "blastic.h"
 #include "WiFiSSLClient.h"
 #include "SerialCliTask.h"
@@ -19,7 +20,11 @@ EEPROMConfig config = {.scale = {.dataPin = 2,
 
 bool debug = false;
 
+} // namespace blastic
+
 namespace cli {
+
+using namespace blastic;
 
 static void version(WordSplit &) {
   MSerial serial;
@@ -63,35 +68,40 @@ static void echo(WordSplit &args) {
 namespace scale {
 
 using namespace blastic::scale;
+
 constexpr const uint32_t scaleCliTimeout = 2000, scaleCliMaxMedianWidth = 16;
 
+#define makeMode(m) std::make_tuple(util::murmur3_32(#m), HX711Mode::m)
+static constexpr const std::tuple<uint32_t, HX711Mode> modes[]{makeMode(A128), makeMode(B), makeMode(A64)};
+
 static void mode(WordSplit &args) {
-  auto modeString = args.nextWord();
-  MSerial serial;
-  serial->print("scale::mode: ");
-  if (!modeString) {
-    serial->print("missing mode argument\n");
+  auto modeStr = args.nextWord();
+  if (!modeStr) {
+    MSerial()->print("scale::mode: missing mode argument\n");
     return;
   }
-  for (uint8_t i = 0; i < std::size(HX711ModeStrings); i++) {
-    if (strcmp(modeString, HX711ModeStrings[i])) continue;
-    config.scale.mode = HX711Mode(i);
-    serial->println(modeString);
+  auto hash = util::murmur3_32(modeStr);
+  for (auto mode : modes) {
+    if (std::get<uint32_t>(mode) != hash) continue;
+    config.scale.mode = std::get<HX711Mode>(mode);
+    MSerial serial;
+    serial->print("scale::mode: mode set to ");
+    serial->println(modeStr);
     return;
   }
-  serial->print("invalid\n");
+  MSerial()->print("scale::mode: mode not found\n");
 }
 
 static void tare(WordSplit &) {
   auto value = raw(config.scale, scaleCliMaxMedianWidth, pdMS_TO_TICKS(scaleCliTimeout));
-  MSerial serial;
-  serial->print("scale::tare: ");
-  if (value == invalidRead) {
-    serial->print("failed to get measurements for tare\n");
+  if (value == readErr) {
+    MSerial()->print("failed to get measurements for tare\n");
     return;
   }
-  auto &calibration = config.scale.calibrations[uint8_t(config.scale.mode)];
+  auto &calibration = config.scale.getCalibration();
   calibration.tareRawRead = value;
+  MSerial serial;
+  serial->print("scale::tare: set to raw read value ");
   serial->println(value);
 }
 
@@ -108,14 +118,14 @@ static void calibrate(WordSplit &args) {
     return;
   }
   auto value = raw(config.scale, scaleCliMaxMedianWidth, pdMS_TO_TICKS(scaleCliTimeout));
-  MSerial serial;
-  serial->print("scale::calibrate: ");
-  if (value == invalidRead) {
-    serial->print("failed to get measurements for calibration\n");
+  if (value == readErr) {
+    MSerial()->print("scale::calibrate: failed to get measurements for calibration\n");
     return;
   }
-  auto &calibration = config.scale.calibrations[uint8_t(config.scale.mode)];
+  auto &calibration = config.scale.getCalibration();
   calibration.weightRawRead = value, calibration.weight = weight;
+  MSerial serial;
+  serial->print("scale::calibrate: set to raw read value ");
   serial->println(value);
 }
 
@@ -125,21 +135,18 @@ static void raw(WordSplit &args) {
   auto value = blastic::scale::raw(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
   serial->print("scale::raw: ");
-  value == invalidRead ? serial->print("invalid\n") : serial->println(value);
+  value == readErr ? serial->print("HX711 error\n") : serial->println(value);
 }
 
 static void weight(WordSplit &args) {
-  auto &calibration = config.scale.calibrations[uint8_t(config.scale.mode)];
-  if (calibration.weightRawRead - calibration.tareRawRead == 0) {
-    MSerial()->print("scale::weight: cannot calculate weight without calibration parameters\n");
-    return;
-  }
   auto medianWidthArg = args.nextWord();
   auto medianWidth = min(max(1, medianWidthArg ? atoi(medianWidthArg) : 1), scaleCliMaxMedianWidth);
   auto value = blastic::scale::weight(config.scale, medianWidth, pdMS_TO_TICKS(scaleCliTimeout));
   MSerial serial;
   serial->print("scale::weight: ");
-  isnan(value) ? serial->print("invalid\n") : serial->println(value);
+  if (value == weightCal) serial->print("uncalibrated\n");
+  else if (value == weightErr) serial->print("HX711 error\n");
+  else serial->println(value);
 }
 
 } // namespace scale
@@ -242,7 +249,7 @@ static void ping(WordSplit &args) {
     IPAddress ip;
     if (ip.fromString(address)) {
       MSerial()->print("tls::ping: tls validation is broken as of firmware version " WIFI_FIRMWARE_LATEST_VERSION
-                       " for direct to IP connections\n");
+                       " for direct to IP connections, giving up\n");
       return;
     }
   }
@@ -262,7 +269,7 @@ static void ping(WordSplit &args) {
   MSerial()->print("tls::ping: connected to wifi\n");
 
   {
-    WiFiSSLClient client;
+    blastic::WiFiSSLClient client;
     if (!client.connect(address, port)) {
       MSerial()->print("tls::ping: failed to connect to server\n");
       return;
@@ -320,18 +327,14 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
 
 } // namespace cli
 
-} // namespace blastic
-
 void setup() [[noreturn]] {
   using namespace blastic;
-  // XXX do not use FreeRTOS functions other than allocating tasks, crashes seen otherwise
   Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
   Serial.print("Booting blastic-scale version ");
   Serial.println(version);
   // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
   static cli::SerialCliTask<Serial, 4 * 1024> cli(cli::callbacks);
-  static util::StaticTask display(ui::loop, "DisplayTask");
   Serial.print("Starting FreeRTOS scheduler.\n");
   vTaskStartScheduler();
   configASSERT(false && "vTaskStartScheduler() should never return");

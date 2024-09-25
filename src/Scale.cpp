@@ -12,7 +12,7 @@ static SemaphoreHandle_t mutex = xSemaphoreCreateMutexStatic(&mutexBuffer);
 int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) {
   configASSERT(medianWidth);
   auto startTick = xTaskGetTickCount();
-  if (!xSemaphoreTake(mutex, timeout)) return invalidRead;
+  if (!xSemaphoreTake(mutex, timeout)) return readErr;
   auto measurementStartTick = xTaskGetTickCount();
   const auto sck = config.clockPin, dt = config.dataPin;
   // poweroff the controller and release the mutex
@@ -44,7 +44,7 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
         serial->print("scale: timed out waiting for data, median index ");
         serial->println(i);
       }
-      return invalidRead;
+      return readErr;
     }
     delayMicroseconds(1); // HX711 datasheet T1
     // drive sck pin to receive data from dt pin
@@ -78,6 +78,15 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
   std::sort(reads, reads + medianWidth);
   if (medianWidth % 2) return reads[medianWidth / 2];
   return (reads[medianWidth / 2 - 1] + reads[medianWidth / 2]) / 2;
+}
+
+util::AnnotatedFloat weight(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) {
+  auto calibration = config.getCalibration();
+  if (!calibration) return weightCal;
+  auto value = raw(config, medianWidth, timeout);
+  if (value == readErr) return weightErr;
+  return util::AnnotatedFloat(calibration.weight * float(value - calibration.tareRawRead) /
+                              float(calibration.weightRawRead - calibration.tareRawRead));
 }
 
 } // namespace scale
