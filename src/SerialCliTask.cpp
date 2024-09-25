@@ -7,7 +7,7 @@ namespace details {
 // task delay in poll loop, milliseconds
 static constexpr const uint32_t pollInterval = 250;
 
-void loop(const CliCallback *const callbacks, Stream &input, util::MutexedGenerator<Print> outputMutexGen) {
+void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator<Print> outputMutexGen) {
   /*
     Avoid String usage at all costs because it uses realloc(),
     shoot in your foot with pointer arithmetic.
@@ -52,7 +52,7 @@ void loop(const CliCallback *const callbacks, Stream &input, util::MutexedGenera
       // skip if line is empty
       if (!command || !*command) goto shiftLeftBuffer;
       commandHash = util::murmur3_32(command);
-      for (auto callback = callbacks; callback->function; callback++)
+      for (auto callback = _this.callbacks; callback->function; callback++)
         if (callback->cliCommandHash == commandHash) {
           callback->function(commandLine);
           goto shiftLeftBuffer;

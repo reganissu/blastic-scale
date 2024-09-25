@@ -14,9 +14,12 @@ class CliCallback;
 
 namespace details {
 
-void loop(const CliCallback *const callbacks, Stream &input, util::MutexedGenerator<Print> outputMutexGen);
+struct SerialCliTaskState {
+  const CliCallback *const callbacks;
+};
+void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator<Print> outputMutexGen);
 
-}
+} // namespace details
 
 /*
   A CliCallback struct contains the MurMur3 hash of the command string, and
@@ -37,7 +40,8 @@ public:
       : cliCommandHash(util::murmur3_32(str)), function(function) {}
 
 private:
-  friend void details::loop(const CliCallback *const callbacks, Stream &input, util::MutexedGenerator<Print> outputMutexGen);
+  friend void details::loop(const details::SerialCliTaskState &_this, Stream &input,
+                            util::MutexedGenerator<Print> outputMutexGen);
 
   const uint32_t cliCommandHash;
   const CliFunctionPointer function;
@@ -121,7 +125,7 @@ public:
   // Note: the serial must be initialized alreay
   SerialCliTask(const CliCallback *callbacks, const char *name = "SerialCliTask",
                 UBaseType_t priority = configMAX_PRIORITIES - 1)
-      : callbacks(callbacks), task(SerialCliTask::loop, this, name, priority) {
+      : _this({callbacks}), task(SerialCliTask::loop, this, name, priority) {
     /*
       Read operations busy poll using millis(). This task
       runs with the maximum priority, so we must not starve the other
@@ -132,12 +136,11 @@ public:
   }
 
 private:
-  const CliCallback *const callbacks;
+  details::SerialCliTaskState _this;
   util::StaticTask<StackSize> task;
-
-  static void loop(void *_this) {
-    auto &me = *reinterpret_cast<SerialCliTask *>(_this);
-    details::loop(me.callbacks, serial, util::MutexedGenerator<Print>::get<serial>());
+  static void loop(void *me) {
+    auto &_this = *reinterpret_cast<SerialCliTask *>(me);
+    details::loop(_this._this, serial, util::MutexedGenerator<Print>::get<serial>());
   }
 };
 

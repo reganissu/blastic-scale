@@ -17,6 +17,11 @@ EEPROMConfig config = {.scale = {.dataPin = 2,
                        // XXX GCC bug, cannot use initializer lists with strings
                        .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10, 10}};
 
+static Submitter &submitter();
+
+using SerialCliTask = cli::SerialCliTask<Serial, 4 * 1024>;
+static SerialCliTask &cliTask();
+
 bool debug = false;
 
 } // namespace blastic
@@ -24,12 +29,6 @@ bool debug = false;
 namespace cli {
 
 using namespace blastic;
-
-static void version(WordSplit &) {
-  MSerial serial;
-  serial->print("version: ");
-  serial->println(blastic::version);
-}
 
 static void uptime(WordSplit &) {
   auto s = millis() / 1000;
@@ -45,6 +44,13 @@ static void uptime(WordSplit &) {
   serial->print("s\n");
 }
 
+static void version(WordSplit &ws) {
+  MSerial serial;
+  serial->print("version: ");
+  serial->println(blastic::version);
+  uptime(ws);
+}
+
 static void debug(WordSplit &args) {
   blastic::debug = args.nextWordIs("on");
   if (blastic::debug) modem.debug(Serial, 2);
@@ -52,16 +58,6 @@ static void debug(WordSplit &args) {
   MSerial serial;
   serial->print("debug: ");
   serial->print(blastic::debug ? "on\n" : "off\n");
-}
-
-static void echo(WordSplit &args) {
-  MSerial serial;
-  serial->print("echo:");
-  for (char *arg = args.nextWord(); arg; arg = args.nextWord()) {
-    serial->print(' ');
-    serial->print(arg);
-  }
-  serial->println();
 }
 
 namespace scale {
@@ -323,7 +319,6 @@ static void ping(WordSplit &args) {
 static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(uptime),
                                                makeCliCallback(debug),
-                                               makeCliCallback(echo),
                                                makeCliCallback(scale::mode),
                                                makeCliCallback(scale::tare),
                                                makeCliCallback(scale::calibrate),
@@ -338,14 +333,29 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
 
 } // namespace cli
 
+namespace blastic {
+
+static Submitter &submitter() {
+  static Submitter submitter("Submitter", configMAX_PRIORITIES / 2);
+  return submitter;
+}
+
+static SerialCliTask &cliTask() {
+  // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
+  static SerialCliTask cliTask(cli::callbacks);
+  return cliTask;
+}
+
+} // namespace blastic
+
 void setup() [[noreturn]] {
   using namespace blastic;
   Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
   Serial.print("Booting blastic-scale version ");
   Serial.println(version);
-  // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
-  static cli::SerialCliTask<Serial, 4 * 1024> cli(cli::callbacks);
+  submitter();
+  cliTask();
   Serial.print("Starting FreeRTOS scheduler.\n");
   vTaskStartScheduler();
   configASSERT(false && "vTaskStartScheduler() should never return");
