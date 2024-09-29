@@ -36,7 +36,9 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
     // wait for data ready
     while (digitalRead(dt) == HIGH) {
       if (timeout == portMAX_DELAY || xTaskGetTickCount() - startTick < timeout) {
-        vTaskDelay(pdMS_TO_TICKS(minReadDelayMillis));
+        auto tickDelay = pdMS_TO_TICKS(minReadDelayMillis);
+        if (tickDelay) vTaskDelay(pdMS_TO_TICKS(minReadDelayMillis));
+        else delay(minReadDelayMillis);
         continue;
       }
       // timed out

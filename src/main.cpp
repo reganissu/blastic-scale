@@ -306,7 +306,6 @@ static void ping(WordSplit &args) {
 
     constexpr const size_t maxLen = std::min(255, SERIAL_BUFFER_SIZE - 1);
     uint8_t tlsInput[maxLen];
-    // XXX TODO time period is broken, this below counts as 10ms
     constexpr const unsigned int waitingReadInterval = 100;
     while (true) {
       // this is non blocking as the underlying code may return zero (and available() == 0) while still being connected
@@ -365,7 +364,7 @@ void setup() {
   Serial.println(version);
   submitter();
   cliTask();
-  Serial.println("setup: done\n");
+  Serial.print("setup: done\n");
 }
 
 /*
@@ -378,23 +377,25 @@ static void _assert_func_freertos(const char *file, int line, const char *failed
                                   const uint32_t (&stackTrace)[CMB_CALL_STACK_MAX_DEPTH], size_t stackDepth)
     [[noreturn]] {
   using namespace blastic;
-  vTaskPrioritySet(nullptr, tskIDLE_PRIORITY);
+  vTaskPrioritySet(nullptr, tskIDLE_PRIORITY + 1);
   while (true) {
-    MSerial serial;
-    if (!*serial) serial->begin(BLASTIC_MONITOR_SPEED);
-    while (!*serial);
-    serial->print("assert: ");
-    serial->print(file);
-    serial->print(':');
-    serial->print(line);
-    serial->print(" failed expression ");
-    serial->println(failedExpression);
-    serial->print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
-    for (int i = 0; i < stackDepth; i++) {
-      serial->print(' ');
-      serial->print(stackTrace[i], 16);
+    {
+      MSerial serial;
+      if (!*serial) serial->begin(BLASTIC_MONITOR_SPEED);
+      while (!*serial);
+      serial->print("assert: ");
+      serial->print(file);
+      serial->print(':');
+      serial->print(line);
+      serial->print(" failed expression ");
+      serial->println(failedExpression);
+      serial->print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
+      for (int i = 0; i < stackDepth; i++) {
+        serial->print(' ');
+        serial->print(stackTrace[i], 16);
+      }
+      serial->println();
     }
-    serial->println();
     vTaskDelay(pdMS_TO_TICKS(assertSleepMillis));
   }
 }
@@ -404,19 +405,21 @@ static void _assert_func_arduino(const char *file, int line, const char *failedE
     [[noreturn]] {
   if (!Serial) Serial.begin(BLASTIC_MONITOR_SPEED);
   while (!Serial);
-  Serial.print("assert: ");
-  Serial.print(file);
-  Serial.print(':');
-  Serial.print(line);
-  Serial.print(" failed expression ");
-  Serial.println(failedExpression);
-  Serial.print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
-  for (int i = 0; i < stackDepth; i++) {
-    Serial.print(' ');
-    Serial.print(stackTrace[i], 16);
+  while (true) {
+    Serial.print("assert: ");
+    Serial.print(file);
+    Serial.print(':');
+    Serial.print(line);
+    Serial.print(" failed expression ");
+    Serial.println(failedExpression);
+    Serial.print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
+    for (int i = 0; i < stackDepth; i++) {
+      Serial.print(' ');
+      Serial.print(stackTrace[i], 16);
+    }
+    Serial.println();
+    delay(assertSleepMillis);
   }
-  Serial.println();
-  delay(assertSleepMillis);
 }
 
 extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression)
