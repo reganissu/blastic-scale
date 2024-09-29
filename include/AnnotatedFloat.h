@@ -14,7 +14,7 @@ union AnnotatedFloat {
   AnnotatedFloat() {}
   explicit constexpr AnnotatedFloat(float f) : f(f) {}
 
-  explicit constexpr AnnotatedFloat(const char (&msg)[4]) : f(NAN) {
+  explicit AnnotatedFloat(const char (&msg)[4]) : f(NAN) {
     annotation = 0;
     for (int i = 0; i < 3 && msg[i]; i++) annotation |= msg[i] << (i * 8);
   }

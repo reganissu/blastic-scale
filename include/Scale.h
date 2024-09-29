@@ -32,7 +32,7 @@ static constexpr const std::tuple<uint32_t, HX711Mode> modeHashes[]{makeModeHash
 static constexpr const char *modeStrings[]{makeModeString(A128), makeModeString(B), makeModeString(A64)};
 
 constexpr const int32_t readErr = 0x800000;
-constexpr const util::AnnotatedFloat weightCal = util::AnnotatedFloat("cal"), weightErr = util::AnnotatedFloat("err");
+const util::AnnotatedFloat weightCal = util::AnnotatedFloat("cal"), weightErr = util::AnnotatedFloat("err");
 constexpr const uint32_t minReadDelayMillis = 1000 / 80; // max output rate is 80Hz
 
 /*
