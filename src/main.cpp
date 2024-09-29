@@ -26,7 +26,7 @@ static Submitter &submitter();
 using SerialCliTask = cli::SerialCliTask<Serial, 4 * 1024>;
 static SerialCliTask &cliTask();
 
-uint32_t debug = false;
+uint32_t debug = 0;
 
 } // namespace blastic
 

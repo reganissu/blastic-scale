@@ -59,7 +59,7 @@ void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator
         }
       {
         auto output = outputMutexGen.lock();
-        output->print("cli: command not found :");
+        output->print("cli: command not found: ");
         output->println(command);
       }
       // move bytes after newline to start of buffer, repeat

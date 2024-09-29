@@ -28,7 +28,8 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
   delayMicroseconds(64);
   digitalWrite(sck, LOW);
   // HX711 datasheet "Output settling time", we cannot query the data rate so use the maximum
-  vTaskDelay(pdMS_TO_TICKS(400));
+  constexpr const uint32_t outputSettlingTime = 400;
+  vTaskDelay(pdMS_TO_TICKS(outputSettlingTime));
 
   int32_t reads[medianWidth];
   // read #medianWidth values. Read and discard one extra value first if we need to set the chan A gain mode to 64
@@ -37,7 +38,7 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
     while (digitalRead(dt) == HIGH) {
       if (timeout == portMAX_DELAY || xTaskGetTickCount() - startTick < timeout) {
         auto tickDelay = pdMS_TO_TICKS(minReadDelayMillis);
-        if (tickDelay) vTaskDelay(pdMS_TO_TICKS(minReadDelayMillis));
+        if (tickDelay) vTaskDelay(tickDelay);
         else delay(minReadDelayMillis);
         continue;
       }
