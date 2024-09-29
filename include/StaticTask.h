@@ -38,10 +38,8 @@ public:
                     UBaseType_t priority = tskIDLE_PRIORITY + 1) {
     static_assert(sizeof(ArgType) == sizeof(void *));
     configASSERT(!handle);
-    handle = xTaskCreateStatic(taskFunction, name, sizeof(stack) / sizeof(stack[0]), static_cast<void *>(arg), priority,
-                               stack, &taskBuffer);
-    configASSERT(handle);
-    return handle;
+    return handle = xTaskCreateStatic(taskFunction, name, sizeof(stack) / sizeof(stack[0]), static_cast<void *>(arg),
+                                      priority, stack, &taskBuffer);
   }
 
   TaskHandle_t init(voidFuncPtr taskFunction, const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1) {

@@ -15,7 +15,7 @@
 
 namespace blastic {
 
-extern bool debug;
+extern uint32_t debug;
 
 struct [[gnu::packed]] EEPROMConfig {
   scale::EEPROMConfig scale;

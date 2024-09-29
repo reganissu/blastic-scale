@@ -1,11 +1,12 @@
 #include <iterator>
+#include <cm_backtrace/cm_backtrace.h>
 #include "blastic.h"
-#include "WiFiSSLClient.h"
 #include "SerialCliTask.h"
+#include "Submitter.h"
 
 namespace blastic {
 
-static constexpr const char version[] = {GIT_COMMIT " worktree " GIT_WORKTREE_STATUS};
+static constexpr const char version[] = {BLASTIC_GIT_COMMIT " worktree " BLASTIC_GIT_WORKTREE_STATUS};
 
 // initialize configuration with sane defaults
 EEPROMConfig config = {.scale = {.dataPin = 2,
@@ -17,14 +18,15 @@ EEPROMConfig config = {.scale = {.dataPin = 2,
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
                        // XXX GCC bug, cannot use initializer lists with strings
-                       .wifi = WifiConnection::EEPROMConfig{"unconfigured-ssid", "unconfigured-password", 10, 10}};
+                       .wifi = WifiConnection::EEPROMConfig{"", "", 10, 10},
+                       .submit = {.threshold = 0.001}};
 
 static Submitter &submitter();
 
 using SerialCliTask = cli::SerialCliTask<Serial, 4 * 1024>;
 static SerialCliTask &cliTask();
 
-bool debug = false;
+uint32_t debug = false;
 
 } // namespace blastic
 
@@ -54,12 +56,13 @@ static void version(WordSplit &ws) {
 }
 
 static void debug(WordSplit &args) {
-  blastic::debug = args.nextWordIs("on");
-  if (blastic::debug) modem.debug(Serial, 2);
+  auto arg = args.nextWord() ?: "0";
+  blastic::debug = atoi(arg);
+  if (blastic::debug >= 2) modem.debug(Serial, 2);
   else modem.noDebug();
   MSerial serial;
   serial->print("debug: ");
-  serial->print(blastic::debug ? "on\n" : "off\n");
+  serial->println(blastic::debug);
 }
 
 namespace scale {
@@ -207,6 +210,10 @@ static void configure(WordSplit &args) {
 }
 
 static void connect(WordSplit &) {
+  if (!strcmp(config.wifi.ssid, "")) {
+    MSerial()->println("wifi::connect configure the connection first with wifi::configure\n");
+    return;
+  }
   uint8_t bssid[6];
   int32_t rssi;
   IPAddress ip, gateway, dns1, dns2;
@@ -359,4 +366,63 @@ void setup() {
   submitter();
   cliTask();
   Serial.println("setup: done\n");
+}
+
+/*
+  Hook failed assert to a Serial print, then throw a stack trace every 10 seconds.
+*/
+
+constexpr const int assertSleepMillis = 10000;
+
+static void _assert_func_freertos(const char *file, int line, const char *failedExpression,
+                                  const uint32_t (&stackTrace)[CMB_CALL_STACK_MAX_DEPTH], size_t stackDepth)
+    [[noreturn]] {
+  using namespace blastic;
+  vTaskPrioritySet(nullptr, tskIDLE_PRIORITY);
+  while (true) {
+    MSerial serial;
+    if (!*serial) serial->begin(BLASTIC_MONITOR_SPEED);
+    while (!*serial);
+    serial->print("assert: ");
+    serial->print(file);
+    serial->print(':');
+    serial->print(line);
+    serial->print(" failed expression ");
+    serial->println(failedExpression);
+    serial->print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
+    for (int i = 0; i < stackDepth; i++) {
+      serial->print(' ');
+      serial->print(stackTrace[i], 16);
+    }
+    serial->println();
+    vTaskDelay(pdMS_TO_TICKS(assertSleepMillis));
+  }
+}
+
+static void _assert_func_arduino(const char *file, int line, const char *failedExpression,
+                                 const uint32_t (&stackTrace)[CMB_CALL_STACK_MAX_DEPTH], size_t stackDepth)
+    [[noreturn]] {
+  if (!Serial) Serial.begin(BLASTIC_MONITOR_SPEED);
+  while (!Serial);
+  Serial.print("assert: ");
+  Serial.print(file);
+  Serial.print(':');
+  Serial.print(line);
+  Serial.print(" failed expression ");
+  Serial.println(failedExpression);
+  Serial.print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
+  for (int i = 0; i < stackDepth; i++) {
+    Serial.print(' ');
+    Serial.print(stackTrace[i], 16);
+  }
+  Serial.println();
+  delay(assertSleepMillis);
+}
+
+extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression)
+    [[noreturn]] {
+  uint32_t stackTrace[CMB_CALL_STACK_MAX_DEPTH];
+  size_t stackDepth = cm_backtrace_call_stack(stackTrace, CMB_CALL_STACK_MAX_DEPTH, cmb_get_sp());
+  (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING ? _assert_func_freertos : _assert_func_arduino)(
+      file, line, failedExpression, stackTrace, stackDepth);
 }

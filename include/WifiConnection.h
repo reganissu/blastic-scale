@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 #include <WiFiS3.h>
+#include <WiFiSSLClient.h>
 #include "Mutexed.h"
 
 namespace blastic {

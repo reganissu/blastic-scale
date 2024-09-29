@@ -19,7 +19,7 @@ union AnnotatedFloat {
     for (int i = 0; i < 3 && msg[i]; i++) annotation |= msg[i] << (i * 8);
   }
 
-  void getAnnotation(char (&msg)[4]) const {
+  void getAnnotation(char *msg) const {
     for (uint32_t annotation = std::isnan(f) ? this->annotation : 0, i = 0; i < 3; i++, annotation >>= 8)
       msg[i] = annotation;
     msg[3] = 0;

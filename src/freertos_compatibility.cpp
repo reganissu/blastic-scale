@@ -1,6 +1,6 @@
-#include "blastic.h"
+#include <Arduino.h>
+#include <Arduino_FreeRTOS.h>
 #include "StaticTask.h"
-#include <cm_backtrace/cm_backtrace.h>
 
 #if configSUPPORT_STATIC_ALLOCATION == 1
 
@@ -8,12 +8,16 @@
   Static allocation functions, as suggested in the FreeRTOS guide.
 */
 
+#if configUSE_TIMERS == 1
+
 void vApplicationGetTimerTaskMemory(StaticTask_t **taskBuffer, StackType_t **stackBuffer, uint32_t *stackSize) {
   static util::StaticTask timerTaskBuffers;
   *taskBuffer = &timerTaskBuffers.taskBuffer;
   *stackBuffer = timerTaskBuffers.stack;
   *stackSize = sizeof(timerTaskBuffers.stack) / sizeof(timerTaskBuffers.stack[0]);
 }
+
+#endif
 
 void vApplicationGetIdleTaskMemory(StaticTask_t **taskBuffer, StackType_t **stackBuffer, uint32_t *stackSize) {
   static util::StaticTask idleTaskBuffers;
@@ -73,54 +77,6 @@ extern "C" void *__wrap__malloc_r(struct _reent *r, size_t s) {
 }
 
 #endif
-
-/*
-  Hook failed assert to a Serial print, then throw a stack trace every 10 seconds.
-*/
-extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression) {
-  using namespace blastic;
-  uint32_t stackTrace[CMB_CALL_STACK_MAX_DEPTH];
-  auto stackDepth = cm_backtrace_call_stack(stackTrace, CMB_CALL_STACK_MAX_DEPTH, cmb_get_sp());
-  constexpr const int sleepMillis = 10000;
-  while (true) {
-    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-      vTaskPrioritySet(nullptr, tskIDLE_PRIORITY);
-      MSerial serial;
-      if (!*serial) serial->begin(BLASTIC_MONITOR_SPEED);
-      while (!*serial);
-      vTaskPrioritySet(nullptr, configMAX_PRIORITIES - 1);
-      serial->print("assert: ");
-      serial->print(file);
-      serial->print(':');
-      serial->print(line);
-      serial->print(" failed expression ");
-      serial->println(failedExpression);
-      serial->print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
-      for (int i = 0; i < stackDepth; i++) {
-        serial->print(' ');
-        serial->print(stackTrace[i], 16);
-      }
-      serial->println();
-      vTaskDelay(pdMS_TO_TICKS(sleepMillis));
-    } else {
-      if (!Serial) Serial.begin(BLASTIC_MONITOR_SPEED);
-      while (!Serial);
-      Serial.print("assert: ");
-      Serial.print(file);
-      Serial.print(':');
-      Serial.print(line);
-      Serial.print(" failed expression ");
-      Serial.println(failedExpression);
-      Serial.print("assert: addr2line -e $FIRMWARE_FILE -a -f -C ");
-      for (int i = 0; i < stackDepth; i++) {
-        Serial.print(' ');
-        Serial.print(stackTrace[i], 16);
-      }
-      Serial.println();
-      delay(sleepMillis);
-    }
-  }
-}
 
 void loop() [[noreturn]] {
   Serial.print("setup: starting FreeRTOS scheduler\n");

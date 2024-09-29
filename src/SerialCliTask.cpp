@@ -7,7 +7,7 @@ namespace details {
 // task delay in poll loop, milliseconds
 static constexpr const uint32_t pollInterval = 250;
 
-void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator<Print> outputMutexGen) {
+void loop(const SerialCliTaskState &_this, Stream &input, util::MutexedGenerator<Print> outputMutexGen) [[noreturn]] {
   /*
     Avoid String usage at all costs because it uses realloc(),
     shoot in your foot with pointer arithmetic.
