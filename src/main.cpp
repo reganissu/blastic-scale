@@ -325,8 +325,8 @@ static void ping(WordSplit &args) {
 } // namespace tls
 
 #define makeAction(c) std::make_tuple(util::murmur3_32(#c), Submitter::Action::c)
-static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{makeAction(OK), makeAction(NEXT),
-                                                                         makeAction(BACK)};
+static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{makeAction(NONE), makeAction(OK), makeAction(NEXT),
+                                                                         makeAction(PREVIOUS), makeAction(BACK)};
 
 static void action(WordSplit &args) {
   auto actionStr = args.nextWord();

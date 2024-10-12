@@ -3,3 +3,4 @@ ColumnLimit: 120
 AllowShortLoopsOnASingleLine: true
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 SortIncludes: Never
+AllowShortCaseLabelsOnASingleLine: true
