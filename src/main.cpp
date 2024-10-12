@@ -19,7 +19,7 @@ EEPROMConfig config = {.scale = {.dataPin = 2,
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
                        // XXX GCC bug, cannot use initializer lists with strings
                        .wifi = WifiConnection::EEPROMConfig{"", "", 10, 10},
-                       .submit = {.threshold = 0.01}};
+                       .submit = {.threshold = 0.05}};
 
 static Submitter &submitter();
 
