@@ -19,7 +19,7 @@ EEPROMConfig config = {.scale = {.dataPin = 2,
                                                   {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
                        // XXX GCC bug, cannot use initializer lists with strings
                        .wifi = WifiConnection::EEPROMConfig{"", "", 10, 10},
-                       .submit = {.threshold = 0.001}};
+                       .submit = {.threshold = 0.01}};
 
 static Submitter &submitter();
 
@@ -324,6 +324,40 @@ static void ping(WordSplit &args) {
 
 } // namespace tls
 
+#define makeAction(c) std::make_tuple(util::murmur3_32(#c), Submitter::Action::c)
+static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{makeAction(OK), makeAction(NEXT),
+                                                                         makeAction(BACK)};
+
+static void action(WordSplit &args) {
+  auto actionStr = args.nextWord();
+  if (!actionStr) MSerial()->print("action: missing command argument\n");
+  auto hash = util::murmur3_32(actionStr);
+  for (auto action : actions) {
+    if (std::get<uint32_t>(action) != hash) continue;
+    submitter().action(std::get<Submitter::Action>(action));
+    MSerial serial;
+    serial->print("action: sent action ");
+    serial->println(actionStr);
+    return;
+  }
+  MSerial()->print("action: action not found\n");
+}
+
+namespace submit {
+
+static void threshold(WordSplit &args) {
+  if (auto thresholdString = args.nextWord()) {
+    char *thresholdEnd;
+    auto threshold = strtof(thresholdString, &thresholdEnd);
+    if (thresholdString != thresholdEnd) config.submit.threshold = threshold;
+  }
+  MSerial serial;
+  serial->print("submit::threshold: ");
+  serial->println(config.submit.threshold, 3);
+}
+
+} // namespace submit
+
 static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(uptime),
                                                makeCliCallback(debug),
@@ -337,6 +371,8 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(wifi::configure),
                                                makeCliCallback(wifi::connect),
                                                makeCliCallback(tls::ping),
+                                               makeCliCallback(action),
+                                               makeCliCallback(submit::threshold),
                                                CliCallback()};
 
 } // namespace cli

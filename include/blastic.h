@@ -12,6 +12,7 @@
 // classes / task functions for devices
 #include "Scale.h"
 #include "WifiConnection.h"
+#include "Submitter.h"
 
 namespace blastic {
 
@@ -20,6 +21,7 @@ extern uint32_t debug;
 struct [[gnu::packed]] EEPROMConfig {
   scale::EEPROMConfig scale;
   WifiConnection::EEPROMConfig wifi;
+  blastic::Submitter::EEPROMConfig submit;
 };
 
 extern EEPROMConfig config;
