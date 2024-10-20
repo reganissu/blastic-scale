@@ -69,7 +69,7 @@ int32_t raw(const EEPROMConfig &config, size_t medianWidth, TickType_t timeout) 
     reads[i] = value;
   }
   release();
-  if (debug) {
+  if (debug >= 2) {
     auto endTick = xTaskGetTickCount();
     MSerial serial;
     serial->print("scale::rawMedian:");

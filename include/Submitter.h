@@ -13,13 +13,13 @@ constexpr const plastic plastics[]{plastic::PET, plastic::HDPE, plastic::PVC,  p
 
 constexpr const char *plasticName(plastic p) {
   switch (p) {
-  case plastic::PET: return "PET";
+  case plastic::PET: return "Pet";
   case plastic::HDPE: return "HDPE";
   case plastic::PVC: return "PVC";
   case plastic::LDPE: return "LDPE";
   case plastic::PP: return "PP";
   case plastic::PS: return "PS";
-  default: return "other";
+  default: return "Other";
   }
 }
 
@@ -45,6 +45,10 @@ public:
 
   struct [[gnu::packed]] EEPROMConfig {
     float threshold;
+    char collectionPoint[128], collectorName[128];
+    struct FormParameters {
+      char urn[128], type[32], collectionPoint[32], collectorName[32], weight[32];
+    } form;
   };
 
   Submitter(const char *name, UBaseType_t priority);

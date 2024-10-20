@@ -3,23 +3,27 @@
 #include "blastic.h"
 #include "SerialCliTask.h"
 #include "Submitter.h"
+#include "utils.h"
 
 namespace blastic {
 
-static constexpr const char version[] = {BLASTIC_GIT_COMMIT " worktree " BLASTIC_GIT_WORKTREE_STATUS};
-
 // initialize configuration with sane defaults
-EEPROMConfig config = {.scale = {.dataPin = 2,
-                                 .clockPin = 3,
-                                 .mode = scale::HX711Mode::A128,
-                                 .calibrations = {{.tareRawRead = 45527,
-                                                   .weightRawRead = 114810,
-                                                   .weight = 1.56}, // works for me, but not for thee
-                                                  {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
-                                                  {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
-                       // XXX GCC bug, cannot use initializer lists with strings
-                       .wifi = WifiConnection::EEPROMConfig{"", "", 10, 10},
-                       .submit = {.threshold = 0.05}};
+EEPROMConfig config = {
+    .scale = {.dataPin = 2,
+              .clockPin = 3,
+              .mode = scale::HX711Mode::A128,
+              .calibrations = {{.tareRawRead = 45527,
+                                .weightRawRead = 114810,
+                                .weight = 1.56}, // works for me, but not for thee
+                               {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f},
+                               {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
+    // XXX GCC bug, cannot use initializer lists with strings
+    .wifi = WifiConnection::EEPROMConfig{"", "", 10, 10},
+    .submit = Submitter::EEPROMConfig{
+        0.05, "", "",
+        Submitter::EEPROMConfig::FormParameters{
+            "docs.google.com/forms/d/e/1FAIpQLSeI3jofIWqtWghblVPOTO1BtUbE8KmoJsGRJuRAu2ceEMIJFw/formResponse",
+            "entry.826036805", "entry.458823532", "entry.649832752", "entry.1219969504"}}};
 
 static Submitter &submitter();
 
@@ -170,7 +174,7 @@ static void status(WordSplit &args) {
   {
     MWiFi wifi;
     status = wifi->status();
-    strncpy(firmwareVersion, wifi->firmwareVersion(), sizeof(firmwareVersion) - 1);
+    strcpy0(firmwareVersion, wifi->firmwareVersion());
   }
   MSerial serial;
   serial->print("wifi::status: status ");
@@ -196,8 +200,8 @@ static void configure(WordSplit &args) {
     MSerial()->print("wifi::configure: missing ssid argument");
     return;
   }
-  strncpy(config.wifi.ssid, ssid, sizeof(config.wifi.ssid) - 1);
-  if (auto password = args.nextWord()) strncpy(config.wifi.password, password, sizeof(config.wifi.password) - 1);
+  strcpy0(config.wifi.ssid, ssid);
+  if (auto password = args.nextWord()) strcpy0(config.wifi.password, password);
   else memset(config.wifi.password, 0, sizeof(config.wifi.password));
   MSerial serial;
   serial->print("wifi::configure: set ssid ");
@@ -325,8 +329,8 @@ static void ping(WordSplit &args) {
 } // namespace tls
 
 #define makeAction(c) std::make_tuple(util::murmur3_32(#c), Submitter::Action::c)
-static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{makeAction(NONE), makeAction(OK), makeAction(NEXT),
-                                                                         makeAction(PREVIOUS), makeAction(BACK)};
+static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{
+    makeAction(NONE), makeAction(OK), makeAction(NEXT), makeAction(PREVIOUS), makeAction(BACK)};
 
 static void action(WordSplit &args) {
   auto actionStr = args.nextWord();
@@ -356,6 +360,46 @@ static void threshold(WordSplit &args) {
   serial->println(config.submit.threshold, 3);
 }
 
+static void configure(WordSplit &args) {
+  auto collectionPoint = args.nextWord();
+  if (!collectionPoint) {
+    MSerial()->print("submit::configure: missing collection point argument\n");
+    return;
+  }
+  strcpy0(config.submit.collectionPoint, collectionPoint);
+  if (auto collectorName = args.nextWord())
+    strcpy0(config.submit.collectorName, collectorName);
+  MSerial serial;
+  serial->print("submit::configure: collection point ");
+  serial->println(config.submit.collectionPoint);
+  if (strlen(config.submit.collectorName)) {
+    serial->print("submit::configure: collector name ");
+    serial->println(config.submit.collectorName);
+  }
+}
+
+static void urn(WordSplit &args) {
+  auto urn = args.nextWord();
+  if (!urn) {
+    MSerial()->print("submit::urn: missing urn\n");
+    return;
+  }
+  if (strstr(urn, "https://") == urn || strstr(urn, "http://") == urn) {
+    MSerial()->print("submit::urn: specify the urn argument without http:// or https://\n");
+    return;
+  }
+  strcpy0(config.submit.collectionPoint, urn);
+  if (auto collectorName = args.nextWord())
+    strcpy0(config.submit.collectorName, collectorName);
+  MSerial serial;
+  serial->print("submit::configure: collection point ");
+  serial->println(config.submit.collectionPoint);
+  if (strlen(config.submit.collectorName)) {
+    serial->print("submit::configure: collector name ");
+    serial->println(config.submit.collectorName);
+  }
+}
+
 } // namespace submit
 
 static constexpr const CliCallback callbacks[]{makeCliCallback(version),
@@ -373,6 +417,8 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(tls::ping),
                                                makeCliCallback(action),
                                                makeCliCallback(submit::threshold),
+                                               makeCliCallback(submit::configure),
+                                               makeCliCallback(submit::urn),
                                                CliCallback()};
 
 } // namespace cli

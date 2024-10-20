@@ -16,6 +16,8 @@
 
 namespace blastic {
 
+constexpr const char version[] = {BLASTIC_GIT_COMMIT " worktree " BLASTIC_GIT_WORKTREE_STATUS};
+
 extern uint32_t debug;
 
 struct [[gnu::packed]] EEPROMConfig {

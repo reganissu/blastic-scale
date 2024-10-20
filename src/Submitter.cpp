@@ -3,6 +3,8 @@
 #include "blastic.h"
 #include <ArduinoGraphics.h>
 #include <Arduino_LED_Matrix.h>
+#include <ArduinoHttpClient.h>
+#include "utils.h"
 
 namespace blastic {
 
@@ -22,9 +24,9 @@ static util::loopFunction scroll(std::string &&str, unsigned int initialDelay = 
                                  unsigned int blinkPeriods = 0) {
   if (!str.size()) return clear();
   int textWidht = str.size() * font.width;
-  scrollDelay = textWidht > matrixWidth ? scrollDelay : 0;
   return [=, str = std::move(str), blinkCounter = 0](uint32_t &counter) mutable {
-    int shiftX = -int(counter), wrapShiftX = shiftX + textWidht + matrixWidth / 2;
+    int shiftX = scrollDelay && textWidht > matrixWidth ? -int(counter) : 0,
+        wrapShiftX = shiftX + textWidht + matrixWidth / 2;
     matrix.clear();
     if (blinkPeriods && (blinkCounter++ / blinkPeriods) & 1) {
       memset(framebuffer, 0, sizeof(framebuffer));
@@ -35,12 +37,10 @@ static util::loopFunction scroll(std::string &&str, unsigned int initialDelay = 
       matrix.print(str.c_str());
       matrix.endText();
     }
-    if (scrollDelay) {
-      if (wrapShiftX < matrixWidth) {
-        matrix.beginText(wrapShiftX, 0);
-        matrix.print(str.c_str());
-        matrix.endText();
-      }
+    if (scrollDelay && textWidht > matrixWidth && wrapShiftX < matrixWidth) {
+      matrix.beginText(wrapShiftX, 0);
+      matrix.print(str.c_str());
+      matrix.endText();
     }
   end:
     if (!scrollDelay) return portMAX_DELAY;
@@ -163,6 +163,8 @@ HasTimedOut<plastic> Submitter::plasticSelection() {
   }
 }
 
+static constexpr const char userAgent[] = "blastic-scale/" BLASTIC_GIT_COMMIT " (" BLASTIC_GIT_WORKTREE_STATUS ")";
+
 void Submitter::loop() [[noreturn]] {
   matrix.begin();
   matrix.background(0);
@@ -182,11 +184,32 @@ void Submitter::loop() [[noreturn]] {
     }
     gotInput();
     if (action != Action::OK) continue;
+    // sanity checks for configuration
+    auto config = blastic::config.submit;
+    if (!strlen(config.collectionPoint)) {
+      painter = scroll("missing collection point name");
+      xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(10000));
+      continue;
+    }
+    const char *path = strchr(config.form.urn, '/');
+    decltype(config.form.urn) serverAddress;
+    if (path) strcpy0(serverAddress, config.form.urn, path - config.form.urn);
+    else {
+      strcpy0(serverAddress, config.form.urn);
+      path = "/";
+    }
+    if (!strlen(config.form.urn) || !strlen(config.form.type) || !strlen(config.form.collectionPoint) ||
+        !strlen(config.form.weight)) {
+      painter = scroll("bad form pointers");
+      xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(5000));
+      continue;
+    }
+
     if (debug) MSerial()->print("submitter: start submission\n");
     painter = scroll("...");
-    auto weight = scale::weight(config.scale, 10);
-    if (!(weight >= config.submit.threshold)) {
-      if (weight < config.submit.threshold) painter = scroll("<= 0");
+    auto weight = scale::weight(blastic::config.scale, 10);
+    if (!(weight >= config.threshold)) {
+      if (weight < config.threshold) painter = scroll("<= 0");
       else painter = scroll("bad value");
       xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(5000));
       continue;
@@ -200,13 +223,91 @@ void Submitter::loop() [[noreturn]] {
     auto plastic = plasticSelection();
     if (plastic.timedOut) continue;
     painter = scroll(plasticName(plastic), 200, 100, 2);
-    xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(10000));
-    // TODO submit
+    xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(2000));
+    painter = scroll("sending form...");
+    int statusCode;
+    {
+      WifiConnection wifi(blastic::config.wifi);
+      if (!wifi) {
+        if (debug) MSerial()->print("submitter: failed to connect to wifi\n");
+        painter = scroll("wifi error");
+        xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(5000));
+        continue;
+      }
+      WiFiSSLClient tls;
+      if (!tls.connect(serverAddress, HttpClient::kHttpsPort)) {
+        MSerial()->print("submitter: failed to connect to server\n");
+        painter = scroll("tls error");
+        xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(5000));
+        return;
+      }
+
+      String formData;
+      formData += config.form.type;
+      formData += '=';
+      formData += uint8_t(plastic.t);
+      formData += '+'; // space
+      formData += plasticName(plastic);
+      formData += '&';
+      formData += config.form.collectionPoint;
+      formData += '=';
+      formData += URLEncoder.encode(config.collectionPoint);
+      formData += '&';
+      formData += config.form.weight;
+      formData += '=';
+      formData += weight;
+      formData += '&';
+      formData += config.form.collectorName;
+      formData += '=';
+      formData += URLEncoder.encode(strlen(config.collectorName) ? config.collectorName : userAgent);
+
+      HttpClient https(tls, serverAddress, HttpClient::kHttpsPort);
+      https.beginRequest();
+      https.noDefaultRequestHeaders();
+      https.connectionKeepAlive();
+      https.post(path);
+      https.sendHeader("Host", serverAddress);
+      https.sendHeader("User-Agent", userAgent);
+      https.sendHeader("Content-Type", "application/x-www-form-urlencoded");
+      https.sendHeader("Content-Length", formData.length());
+      https.sendHeader("Accept", "*/*");
+      https.beginBody();
+      https.print(formData);
+      https.endRequest();
+
+      statusCode = https.responseStatusCode();
+      if (debug) {
+        MSerial serial;
+        serial->print("submitter::response: ");
+        serial->println(statusCode);
+        while (https.headerAvailable()) {
+          serial->print("submitter::response: ");
+          serial->print(https.readHeaderName());
+          serial->print(": ");
+          serial->println(https.readHeaderValue());
+        }
+        serial->print("submitter::response: body:\n");
+        constexpr const size_t maxLen = std::min(255, SERIAL_BUFFER_SIZE - 1);
+        while (https.available()) {
+          char bodyChunk[maxLen];
+          auto len = https.readBytes(bodyChunk, maxLen);
+          serial->write(bodyChunk, len);
+        }
+        serial->println();
+      }
+    }
+    if (statusCode == 200) painter = scroll("ok!");
+    else {
+      std::string errorMsg = (statusCode >= 100 && statusCode < 600) ? "http error " : "connection error ";
+      errorMsg += statusCode;
+      painter = scroll(std::move(errorMsg));
+    }
+    xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(5000));
   }
 }
 
 Submitter::Submitter(const char *name, UBaseType_t priority)
-    : painter("Painter"), task(Submitter::loop, this, name, priority) {}
+    : painter("Painter", priority), task(Submitter::loop, this, name, priority) {}
 
 void Submitter::action(Action action) { xTaskNotify(task, uint8_t(action), eSetValueWithOverwrite); }
 

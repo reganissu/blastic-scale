@@ -19,7 +19,7 @@ using loopFunction = std::function<TickType_t(uint32_t &)>;
 template <size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class Looper {
 
 public:
-  Looper(const char *name, UBaseType_t priority = tskIDLE_PRIORITY + 1)
+  Looper(const char *name, UBaseType_t priority)
       : queue(xQueueCreateStatic(1, sizeof(loopFunction *), queueObjectsBuff, &queueBuff)),
         task(Looper::loop, this, name, priority) {}
 
