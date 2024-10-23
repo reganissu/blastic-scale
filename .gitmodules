@@ -1,3 +1,6 @@
 [submodule "scripts/openssl-keylog"]
-	path = scripts/openssl-keylog
+	path = scripts/deps/openssl-keylog
 	url = https://github.com/wpbrown/openssl-keylog.git
+[submodule "scripts/deps/uno-r4-wifi-usb-bridge"]
+	path = scripts/deps/uno-r4-wifi-usb-bridge
+	url = https://github.com/arduino/uno-r4-wifi-usb-bridge.git

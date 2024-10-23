@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+cd "$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 sudo nft destroy table mitmproxy
 sudo nft add table mitmproxy
 trap 'sudo nft destroy table mitmproxy' EXIT

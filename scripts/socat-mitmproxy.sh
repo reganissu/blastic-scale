@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
+cd "$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 (
-  cd openssl-keylog
+  cd deps/openssl-keylog
   make
 )
 
@@ -45,4 +47,4 @@ function cleanup {
   rm -f socat-mitmproxy-keylog.txt.*
 }
 trap cleanup EXIT
-LD_PRELOAD="$(realpath openssl-keylog/libsslkeylog.so)" SSLKEYLOGFILE=socat-mitmproxy-keylog.txt socat -d -d openssl-listen:8443,cert=socat-mitmproxy.pem,verify=0,fork -
+LD_PRELOAD="$(realpath deps/openssl-keylog/libsslkeylog.so)" SSLKEYLOGFILE=socat-mitmproxy-keylog.txt socat -d -d openssl-listen:8443,cert=socat-mitmproxy.pem,verify=0,fork -
