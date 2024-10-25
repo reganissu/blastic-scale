@@ -1,6 +1,8 @@
 #!/bin/bash
 
-if [[ -z "$BLASTIC_SCALE_PORT" ]]; then
+set -uo pipefail
+
+if [[ -z "${BLASTIC_SCALE_PORT:-}" ]]; then
   BLASTIC_SCALE_PORT="$(arduino-cli board list --fqbn arduino:renesas_uno:unor4wifi --json | \
     jq -r -e '.detected_ports[].port.address, halt_error(if .detected_ports | length != 1 then 10 else 0 end)' 2>/dev/null)"
   if [[ $? != 0 ]]; then

@@ -77,6 +77,14 @@ public:
     return result;
   }
 
+  char *rest(bool ltrim = true, bool rtrim = true) {
+    while (ltrim && *str && isspace(*str)) str++;
+    auto result = str;
+    str += strlen(str);
+    while (rtrim && str > result && isspace(str[-1])) *--str = '\0';
+    return !*result ? nullptr : result;
+  }
+
   bool nextWordIs(const char *str) {
     auto word = nextWord();
     return word && !strcmp(word, str);

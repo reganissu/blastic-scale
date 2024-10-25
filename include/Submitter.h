@@ -1,8 +1,10 @@
 #pragma once
 
+#include <tuple>
 #include "blastic.h"
 #include "StaticTask.h"
 #include "Looper.h"
+#include "utils.h"
 
 namespace blastic {
 
@@ -42,6 +44,10 @@ class Submitter {
 public:
   // Action is a task notification bit
   enum class Action : uint32_t { NONE = 0, OK = 1, NEXT = 1 << 1, PREVIOUS = 1 << 2, BACK = 1 << 3 };
+
+#define makeAction(c) std::make_tuple(util::murmur3_32(#c), Submitter::Action::c)
+  static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{
+      makeAction(NONE), makeAction(OK), makeAction(NEXT), makeAction(PREVIOUS), makeAction(BACK)};
 
   struct [[gnu::packed]] EEPROMConfig {
     float threshold;

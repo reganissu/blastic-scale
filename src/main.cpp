@@ -9,8 +9,8 @@ namespace blastic {
 
 // initialize configuration with sane defaults
 EEPROMConfig config = {
-    .scale = {.dataPin = 2,
-              .clockPin = 3,
+    .scale = {.dataPin = 4,
+              .clockPin = 5,
               .mode = scale::HX711Mode::A128,
               .calibrations = {{.tareRawRead = 45527,
                                 .weightRawRead = 114810,
@@ -168,7 +168,7 @@ static void weight(WordSplit &args) {
 
 namespace wifi {
 
-static void status(WordSplit &args) {
+static void status(WordSplit &) {
   uint8_t status;
   char firmwareVersion[12];
   {
@@ -194,28 +194,35 @@ static void timeout(WordSplit &args) {
   serial->println(config.wifi.disconnectTimeout);
 }
 
-static void configure(WordSplit &args) {
-  auto ssid = args.nextWord();
-  if (!ssid) {
-    MSerial()->print("wifi::configure: missing ssid argument");
-    return;
+static void ssid(WordSplit &args) {
+  auto ssid = args.rest(true, true);
+  if (ssid) {
+    strcpy0(config.wifi.ssid, ssid);
+    memset(config.wifi.password, 0, sizeof(config.wifi.password));
   }
-  strcpy0(config.wifi.ssid, ssid);
-  if (auto password = args.nextWord()) strcpy0(config.wifi.password, password);
-  else memset(config.wifi.password, 0, sizeof(config.wifi.password));
   MSerial serial;
-  serial->print("wifi::configure: set ssid ");
-  serial->print(config.wifi.ssid);
+  serial->print("wifi::ssid: ");
+  if (strlen(config.wifi.ssid)) {
+    serial->print('\'');
+    serial->print(config.wifi.ssid);
+    serial->print("\'\n");
+  } else serial->print("<none>\n");
+}
+
+static void password(WordSplit &args) {
+  if (auto password = args.rest(false, false)) strcpy0(config.wifi.password, password);
+  MSerial serial;
+  serial->print("wifi::password: ");
   if (strlen(config.wifi.password)) {
-    serial->print(" password ");
+    serial->print('\'');
     serial->print(config.wifi.password);
-  }
-  serial->println();
+    serial->print("\'\n");
+  } else serial->print("<none>\n");
 }
 
 static void connect(WordSplit &) {
-  if (!strcmp(config.wifi.ssid, "")) {
-    MSerial()->println("wifi::connect configure the connection first with wifi::configure\n");
+  if (!strlen(config.wifi.ssid)) {
+    MSerial()->print("wifi::connect configure the connection first with wifi::ssid\n");
     return;
   }
   uint8_t bssid[6];
@@ -228,7 +235,7 @@ static void connect(WordSplit &) {
       MSerial serial;
       serial->print("wifi::connect: connection failed (");
       serial->print(status);
-      serial->println(')');
+      serial->print(")\n");
       return;
     }
     MSerial()->print("wifi::connect: connected\n");
@@ -328,25 +335,6 @@ static void ping(WordSplit &args) {
 
 } // namespace tls
 
-#define makeAction(c) std::make_tuple(util::murmur3_32(#c), Submitter::Action::c)
-static constexpr const std::tuple<uint32_t, Submitter::Action> actions[]{
-    makeAction(NONE), makeAction(OK), makeAction(NEXT), makeAction(PREVIOUS), makeAction(BACK)};
-
-static void action(WordSplit &args) {
-  auto actionStr = args.nextWord();
-  if (!actionStr) MSerial()->print("action: missing command argument\n");
-  auto hash = util::murmur3_32(actionStr);
-  for (auto action : actions) {
-    if (std::get<uint32_t>(action) != hash) continue;
-    submitter().action(std::get<Submitter::Action>(action));
-    MSerial serial;
-    serial->print("action: sent action ");
-    serial->println(actionStr);
-    return;
-  }
-  MSerial()->print("action: action not found\n");
-}
-
 namespace submit {
 
 static void threshold(WordSplit &args) {
@@ -360,22 +348,26 @@ static void threshold(WordSplit &args) {
   serial->println(config.submit.threshold, 3);
 }
 
-static void configure(WordSplit &args) {
-  auto collectionPoint = args.nextWord();
-  if (!collectionPoint) {
-    MSerial()->print("submit::configure: missing collection point argument\n");
-    return;
-  }
-  strcpy0(config.submit.collectionPoint, collectionPoint);
-  if (auto collectorName = args.nextWord())
-    strcpy0(config.submit.collectorName, collectorName);
+static void collectionPoint(WordSplit &args) {
+  if (auto collectionPoint = args.rest()) strcpy0(config.submit.collectionPoint, collectionPoint);
   MSerial serial;
-  serial->print("submit::configure: collection point ");
-  serial->println(config.submit.collectionPoint);
+  serial->print("submit::collectionPoint: ");
+  if (strlen(config.submit.collectionPoint)) {
+    serial->print('\'');
+    serial->print(config.submit.collectionPoint);
+    serial->print("\'\n");
+  } else serial->print("<none>\n");
+}
+
+static void collectorName(WordSplit &args) {
+  if (auto collectorName = args.rest()) strcpy0(config.submit.collectorName, collectorName);
+  MSerial serial;
+  serial->print("submit::collectorName: ");
   if (strlen(config.submit.collectorName)) {
-    serial->print("submit::configure: collector name ");
-    serial->println(config.submit.collectorName);
-  }
+    serial->print('\'');
+    serial->print(config.submit.collectorName);
+    serial->print("\'\n");
+  } else serial->print("<none>\n");
 }
 
 static void urn(WordSplit &args) {
@@ -389,15 +381,24 @@ static void urn(WordSplit &args) {
     return;
   }
   strcpy0(config.submit.collectionPoint, urn);
-  if (auto collectorName = args.nextWord())
-    strcpy0(config.submit.collectorName, collectorName);
   MSerial serial;
-  serial->print("submit::configure: collection point ");
-  serial->println(config.submit.collectionPoint);
-  if (strlen(config.submit.collectorName)) {
-    serial->print("submit::configure: collector name ");
-    serial->println(config.submit.collectorName);
+  serial->print("submit::urn: collection point ");
+  serial->println(config.submit.form.urn);
+}
+
+static void action(WordSplit &args) {
+  auto actionStr = args.nextWord();
+  if (!actionStr) MSerial()->print("action: missing command argument\n");
+  auto hash = util::murmur3_32(actionStr);
+  for (auto action : Submitter::actions) {
+    if (std::get<uint32_t>(action) != hash) continue;
+    submitter().action(std::get<Submitter::Action>(action));
+    MSerial serial;
+    serial->print("action: sent action ");
+    serial->println(actionStr);
+    return;
   }
+  MSerial()->print("action: action not found\n");
 }
 
 } // namespace submit
@@ -412,13 +413,15 @@ static constexpr const CliCallback callbacks[]{makeCliCallback(version),
                                                makeCliCallback(scale::raw),
                                                makeCliCallback(scale::weight),
                                                makeCliCallback(wifi::status),
-                                               makeCliCallback(wifi::configure),
+                                               makeCliCallback(wifi::ssid),
+                                               makeCliCallback(wifi::password),
                                                makeCliCallback(wifi::connect),
                                                makeCliCallback(tls::ping),
-                                               makeCliCallback(action),
                                                makeCliCallback(submit::threshold),
-                                               makeCliCallback(submit::configure),
+                                               makeCliCallback(submit::collectionPoint),
+                                               makeCliCallback(submit::collectorName),
                                                makeCliCallback(submit::urn),
+                                               makeCliCallback(submit::action),
                                                CliCallback()};
 
 } // namespace cli
@@ -506,7 +509,7 @@ static void _assert_func_arduino(const char *file, int line, const char *failedE
 
 extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression)
     [[noreturn]] {
-  uint32_t stackTrace[CMB_CALL_STACK_MAX_DEPTH];
+  uint32_t stackTrace[CMB_CALL_STACK_MAX_DEPTH] = {0};
   size_t stackDepth = cm_backtrace_call_stack(stackTrace, CMB_CALL_STACK_MAX_DEPTH, cmb_get_sp());
   (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING ? _assert_func_freertos : _assert_func_arduino)(
       file, line, failedExpression, stackTrace, stackDepth);
