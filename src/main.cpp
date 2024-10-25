@@ -461,7 +461,7 @@ namespace buttons {
 
 void edgeCallback(size_t i, bool rising) {
   if (!rising) return;
-  submitter().action_ISR(std::get<Submitter::Action>(Submitter::actions[i + 1]));
+  return submitter().action_ISR(std::get<Submitter::Action>(Submitter::actions[i + 1]));
 }
 
 } // namespace buttons
