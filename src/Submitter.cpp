@@ -311,4 +311,10 @@ Submitter::Submitter(const char *name, UBaseType_t priority)
 
 void Submitter::action(Action action) { xTaskNotify(task, uint8_t(action), eSetValueWithOverwrite); }
 
+void Submitter::action_ISR(Action action) {
+  BaseType_t woken = pdFALSE;
+  xTaskNotifyFromISR(task, uint8_t(action), eSetValueWithOverwrite, &woken);
+  portYIELD_FROM_ISR(woken);
+}
+
 } // namespace blastic

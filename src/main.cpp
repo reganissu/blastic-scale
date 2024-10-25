@@ -19,11 +19,29 @@ EEPROMConfig config = {
                                {.tareRawRead = 0, .weightRawRead = 0, .weight = 0.f}}},
     // XXX GCC bug, cannot use initializer lists with strings
     .wifi = WifiConnection::EEPROMConfig{"", "", 10, 10},
-    .submit = Submitter::EEPROMConfig{
-        0.05, "", "",
-        Submitter::EEPROMConfig::FormParameters{
-            "docs.google.com/forms/d/e/1FAIpQLSeI3jofIWqtWghblVPOTO1BtUbE8KmoJsGRJuRAu2ceEMIJFw/formResponse",
-            "entry.826036805", "entry.458823532", "entry.649832752", "entry.1219969504"}}};
+    .submit =
+        Submitter::EEPROMConfig{
+            0.05, "", "",
+            Submitter::EEPROMConfig::FormParameters{
+                "docs.google.com/forms/d/e/1FAIpQLSeI3jofIWqtWghblVPOTO1BtUbE8KmoJsGRJuRAu2ceEMIJFw/formResponse",
+                "entry.826036805", "entry.458823532", "entry.649832752", "entry.1219969504"}},
+    .buttons = {
+        {{.pin = 3,
+          .threshold = 10000,
+          .settings =
+              {.div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 152, .count = 1}},
+         {.pin = 2,
+          .threshold = 10000,
+          .settings =
+              {.div = CTSU_CLOCK_DIV_18, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 154, .count = 1}},
+         {.pin = 8,
+          .threshold = 10000,
+          .settings =
+              {.div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 202, .count = 1}},
+         {.pin = 6,
+          .threshold = 10000,
+          .settings = {
+              .div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 282, .count = 1}}}}};
 
 static Submitter &submitter();
 
@@ -439,6 +457,15 @@ static SerialCliTask &cliTask() {
   return cliTask;
 }
 
+namespace buttons {
+
+void edgeCallback(size_t i, bool rising) {
+  if (!rising) return;
+  submitter().action_ISR(std::get<Submitter::Action>(Submitter::actions[i + 1]));
+}
+
+} // namespace buttons
+
 } // namespace blastic
 
 void setup() {
@@ -449,6 +476,7 @@ void setup() {
   Serial.println(version);
   submitter();
   cliTask();
+  buttons::reset(config.buttons);
   Serial.print("setup: done\n");
 }
 

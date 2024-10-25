@@ -59,6 +59,7 @@ public:
 
   Submitter(const char *name, UBaseType_t priority);
   void action(Action action);
+  void action_ISR(Action action);
 
 protected:
   util::Looper<1024> painter;
