@@ -52,6 +52,10 @@ uint32_t debug = 0;
 
 } // namespace blastic
 
+/*
+  Namespace for all the serial cli functions.
+*/
+
 namespace cli {
 
 using namespace blastic;
@@ -466,7 +470,6 @@ static Submitter &submitter() {
 }
 
 static SerialCliTask &cliTask() {
-  // use 4 KiB of stack, this was seen to trigger a stack overflow in wifi functions
   static SerialCliTask cliTask(cli::callbacks);
   return cliTask;
 }
@@ -474,6 +477,7 @@ static SerialCliTask &cliTask() {
 namespace buttons {
 
 void edgeCallback(size_t i, bool rising) {
+  // NB: this is run in an interrupt context, do not do anything heavyweight
   if (!rising) return;
   return submitter().action_ISR(std::get<Submitter::Action>(Submitter::actions[i + 1]));
 }
@@ -549,7 +553,8 @@ static void _assert_func_arduino(const char *file, int line, const char *failedE
   }
 }
 
-extern "C" void __wrap___assert_func(const char *file, int line, const char *, const char *failedExpression)
+// this is a weak function in the Arduino framework so we just need to declare it here without the -Wl,--wrap trick
+extern "C" void __assert_func(const char *file, int line, const char *, const char *failedExpression)
     [[noreturn]] {
   uint32_t stackTrace[CMB_CALL_STACK_MAX_DEPTH] = {0};
   size_t stackDepth = cm_backtrace_call_stack(stackTrace, CMB_CALL_STACK_MAX_DEPTH, cmb_get_sp());

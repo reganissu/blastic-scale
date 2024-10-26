@@ -25,6 +25,10 @@ constexpr const char *plasticName(plastic p) {
   }
 }
 
+/*
+  Wrapper class, to be returned by any function that can time out.
+*/
+
 template <typename T> struct HasTimedOut {
 
   bool timedOut;

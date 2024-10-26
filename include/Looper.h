@@ -16,6 +16,16 @@ void looperTerminate(QueueHandle_t queue, TaskHandle_t looperTask);
 
 using loopFunction = std::function<TickType_t(uint32_t &)>;
 
+/*
+  This class implements a task that continuously runs a provided loopFunction. Think of a thread pool with a single
+  thread. The function can request delays, can cancel itself, and the object owner can change the function at any time.
+  The function is guaranteed to be called at least once.
+
+  The loopFunction is a std::function that accepts a counter argument (which can be modified by the function itself),
+  and returns the ticks that the Looper should wait before calling it again. Return portMAX_DELAY to stop calling the
+  function and to release its closure.
+*/
+
 template <size_t StackSize = configMINIMAL_STACK_SIZE * sizeof(StackType_t)> class Looper {
 
 public:

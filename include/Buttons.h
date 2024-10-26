@@ -7,14 +7,22 @@
 
 namespace blastic {
 
+/*
+  DebouncedTouchSensor has a running counter of detected high/low states, and emits a rising/falling edge signal when
+  more than 75% of the last detected values are different than the current button state. As an example, when the button
+  is not touched, you need 32 * 75% = 24 measurements in the touched state to effectively trigger the rising edge
+  signal.
+*/
+
 class DebouncedTouchSensor : public TouchSensor {
 public:
-  using TouchSensor::TouchSensor;
   struct [[gnu::packed]] EEPROMConfig {
     uint8_t pin;
     uint16_t threshold;
     ctsu_pin_settings_t settings;
   };
+
+  using TouchSensor::TouchSensor;
 
   bool updateRead();
   operator bool() const { return triggered; }
@@ -34,7 +42,15 @@ extern DebouncedTouchSensor sensors[n];
 
 using EEPROMConfig = std::array<DebouncedTouchSensor::EEPROMConfig, n>;
 
+/*
+  Reinitialize the R4_Touch library with a new configuration.
+*/
 void reset(const EEPROMConfig &config);
+
+/*
+  This is implemented in src/main.cpp, and hooks the edge callbacks (that runs in an interrupt context) to the Submitter
+  actions.
+*/
 void edgeCallback(size_t i, bool rising);
 
 } // namespace buttons

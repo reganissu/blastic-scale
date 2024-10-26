@@ -5,6 +5,11 @@
 
 namespace util {
 
+/*
+  AnnotatedFloat is a wrapper around float that can be used to store "error codes" in the unused bits of a NaN float
+  value.
+*/
+
 union AnnotatedFloat {
   float f;
   struct {

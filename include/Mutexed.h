@@ -42,6 +42,12 @@ public:
   auto &operator*() const { return obj; }
 };
 
+/*
+  This class implements template value erasure for the Mutexed class: if you want to write a non-template function
+  that makes use of a Mutexed, first create a MutexedGenerator and pass it to your function. The generator returns
+  a MutexedDynamic object that has the same interface of a Mutexed object.
+*/
+
 template <typename T> class MutexedGenerator {
   T &obj;
   SemaphoreHandle_t &mutex;

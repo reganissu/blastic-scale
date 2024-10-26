@@ -20,6 +20,10 @@ static util::loopFunction clear() {
   };
 }
 
+/*
+  Show a text line on the display, scrolling if necessary.
+*/
+
 static util::loopFunction scroll(std::string &&str, unsigned int initialDelay = 1000, unsigned int scrollDelay = 100,
                                  unsigned int blinkPeriods = 0) {
   if (!str.size()) return clear();
@@ -50,6 +54,23 @@ static util::loopFunction scroll(std::string &&str, unsigned int initialDelay = 
     return pdMS_TO_TICKS(scrollDelay);
   };
 }
+
+/*
+  Show a float value on screen.
+
+  This function is optimized for small displays. On the Arduino UNO R4 WiFi, it shows 3 most significant digits.
+  Points are drawn to indicate the order: the normal decimal point is drawn below the text line (above if the number
+  is negative).
+
+  If the position of the decimal point would be beyond the led matrix width (very large or very small
+  numbers), additional leds are turned on. With 3 digits, there are 2 cases:
+  - numbers >= 1000: additional points are shown for each missing integer digits. For example, 4267 is shown as "426"
+  plus 2 points to the right
+  - numbers < 0.01: additional points are shown on the left in addition to the normal floating decimal point. For
+  example, 0.00543 is shown as "543" with 3 dots to the left.
+
+  Negative numbers do not show a minus sign (-), but rather the position of the point is shown above the digits.
+*/
 
 static util::loopFunction show(float v) {
   if (isnan(v)) {
@@ -108,7 +129,15 @@ static util::loopFunction show(float v) {
   };
 }
 
+/*
+  This function records the last user input. lastInteractionMillis can be used to check for timeouts in the UI.
+*/
+
 void Submitter::gotInput() { lastInteractionMillis = millis(); }
+
+/*
+  Idle loop: show nothing, measure weight every 2 seconds.
+*/
 
 Submitter::Action Submitter::idling() {
   painter = clear();
@@ -127,6 +156,10 @@ Submitter::Action Submitter::idling() {
 
 constexpr const auto idleTimeout = 60000;
 
+/*
+  Preview weight loop: show weight live, measure continuously, as HX711 allows.
+*/
+
 HasTimedOut<Submitter::Action> Submitter::preview() {
   auto prevWeight = util::AnnotatedFloat("n/a");
   for (; millis() - lastInteractionMillis < idleTimeout;) {
@@ -144,6 +177,10 @@ HasTimedOut<Submitter::Action> Submitter::preview() {
   }
   return {};
 }
+
+/*
+  Plastic selection menu: navigate with PREVIOUS and NEXT, cancel with BACK, accept with OK.
+*/
 
 HasTimedOut<plastic> Submitter::plasticSelection() {
   painter = scroll("type");
@@ -164,6 +201,10 @@ HasTimedOut<plastic> Submitter::plasticSelection() {
 }
 
 static constexpr const char userAgent[] = "blastic-scale/" BLASTIC_GIT_COMMIT " (" BLASTIC_GIT_WORKTREE_STATUS ")";
+
+/*
+  Main submitter logic and UI.
+*/
 
 void Submitter::loop() [[noreturn]] {
   matrix.begin();

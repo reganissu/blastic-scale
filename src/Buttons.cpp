@@ -23,6 +23,7 @@ void DebouncedTouchSensor::measurementCallback() {
     if (sensor.updateRead()) buttons::edgeCallback(&sensor - buttons::sensors, sensor);
     restartMeasurement |= sensor.lastMeasures;
   }
+  // if any of the buttons is in a touch state, keep measuring without delay
   if (restartMeasurement) startTouchMeasurement(false);
 }
 
@@ -32,6 +33,7 @@ DebouncedTouchSensor sensors[n];
 
 void reset(const EEPROMConfig &configs) {
   static StaticTimer_t timerBuff;
+  // this timer makes sure that we are measuring the capacitors every 50ms at least
   static TimerHandle_t timer = xTimerCreateStatic(
       "QECapMeasure", pdMS_TO_TICKS(50), true, nullptr, [](TimerHandle_t) { startTouchMeasurement(false); }, &timerBuff);
   xTimerStop(timer, portMAX_DELAY);

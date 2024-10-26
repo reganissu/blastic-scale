@@ -16,9 +16,12 @@ constexpr static uint32_t murmur3_32_scramble(uint32_t dword) {
   return dword;
 }
 
+/*
+  This constexpr function calculates the murmur3 32bit hash of a string. Can be used to make lookup tables for strings.
+*/
+
 constexpr static uint32_t murmur3_32(const char *const str) {
-  uint32_t h = 0xfaa7c96c, len = strlen(str), dwordLen = len & ~uint32_t(3),
-           leftoverBytes = len & uint32_t(3);
+  uint32_t h = 0xfaa7c96c, len = strlen(str), dwordLen = len & ~uint32_t(3), leftoverBytes = len & uint32_t(3);
   for (uint32_t i = 0; i < dwordLen; i += 4) {
     uint32_t dword = 0;
     for (uint32_t j = 0; j < 4; j++) dword |= str[i + j] << j * 8;
