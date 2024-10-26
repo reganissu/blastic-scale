@@ -239,8 +239,15 @@ static void password(WordSplit &args) {
 }
 
 static void connect(WordSplit &) {
+  {
+    MWiFi wifi;
+    if (strcmp(wifi->firmwareVersion(), WIFI_FIRMWARE_LATEST_VERSION)) {
+      MSerial()->print("wifi::connect: bad wifi firmware, need version " WIFI_FIRMWARE_LATEST_VERSION "\n");
+      return;
+    }
+  }
   if (!strlen(config.wifi.ssid)) {
-    MSerial()->print("wifi::connect configure the connection first with wifi::ssid\n");
+    MSerial()->print("wifi::connect: configure the connection first with wifi::ssid\n");
     return;
   }
   uint8_t bssid[6];
@@ -304,6 +311,13 @@ static void ping(WordSplit &args) {
   if (!port || port > uint16_t(-1)) {
     MSerial()->print("tls::ping: invalid port\n");
     return;
+  }
+  {
+    MWiFi wifi;
+    if (strcmp(wifi->firmwareVersion(), WIFI_FIRMWARE_LATEST_VERSION)) {
+      MSerial()->print("tls::ping: bad wifi firmware, need version " WIFI_FIRMWARE_LATEST_VERSION "\n");
+      return;
+    }
   }
   WifiConnection wifi(config.wifi);
   if (!wifi) {

@@ -185,6 +185,14 @@ void Submitter::loop() [[noreturn]] {
     if (action != Action::OK) continue;
     uint32_t cmd;
     // sanity checks for configuration
+    {
+      MWiFi wifi;
+      if (strcmp(wifi->firmwareVersion(), WIFI_FIRMWARE_LATEST_VERSION)) {
+        painter = scroll("bad wifi firmware");
+        xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(10000));
+        continue;
+      }
+    }
     auto config = blastic::config.submit;
     if (!strlen(config.collectionPoint)) {
       painter = scroll("missing collection point name");
