@@ -20,7 +20,7 @@ bool DebouncedTouchSensor::updateRead() {
 void DebouncedTouchSensor::measurementCallback() {
   bool restartMeasurement = false;
   for (auto &sensor : buttons::sensors) {
-    if (sensor.updateRead()) buttons::edgeCallback(buttons::sensors - &sensor, sensor);
+    if (sensor.updateRead()) buttons::edgeCallback(&sensor - buttons::sensors, sensor);
     restartMeasurement |= sensor.lastMeasures;
   }
   if (restartMeasurement) startTouchMeasurement(false);

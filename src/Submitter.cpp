@@ -174,7 +174,6 @@ void Submitter::loop() [[noreturn]] {
   MSerial()->print("submitter: started lcd\n");
   gotInput();
 
-  uint32_t cmd;
   while (true) {
     if (debug) MSerial()->print("submitter: preview\n");
     auto action = preview();
@@ -184,6 +183,7 @@ void Submitter::loop() [[noreturn]] {
     }
     gotInput();
     if (action != Action::OK) continue;
+    uint32_t cmd;
     // sanity checks for configuration
     auto config = blastic::config.submit;
     if (!strlen(config.collectionPoint)) {
@@ -209,7 +209,7 @@ void Submitter::loop() [[noreturn]] {
     painter = scroll("...");
     auto weight = scale::weight(blastic::config.scale, 10);
     if (!(weight >= config.threshold)) {
-      if (weight < config.threshold) painter = scroll("<= 0");
+      if (weight < config.threshold) painter = scroll("<=0");
       else painter = scroll("bad value");
       xTaskNotifyWait(0, -1, &cmd, pdMS_TO_TICKS(5000));
       continue;
