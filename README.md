@@ -1,6 +1,6 @@
 # Blastic scale
 
-This is the software for an IoT scale, based on the [Arduino UNO R4 WiFi](https://docs.arduino.cc/hardware/uno-r4-wifi/), for the [Precious Plastic](https://www.preciousplastic.com/) project. The project is financed by the [Precious Plastic Opens Source Fund](https://pposf.preciousplastic.com/).
+This is the software for an IoT scale, based on the [Arduino UNO R4 WiFi](https://docs.arduino.cc/hardware/uno-r4-wifi/), for the [Precious Plastic](https://www.preciousplastic.com/) project. The project is financed by the [Precious Plastic Open Source Fund](https://pposf.preciousplastic.com/).
 
 This software is in beta phase.
 
