@@ -30,18 +30,18 @@ EEPROMConfig config = {
           .threshold = 10000,
           .settings =
               {.div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 152, .count = 1}},
+         {.pin = 6,
+          .threshold = 10000,
+          .settings = {
+              .div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 282, .count = 1}},
          {.pin = 8,
           .threshold = 10000,
           .settings =
               {.div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 202, .count = 1}},
-         {.pin = 2,
+         {.pin = 9,
           .threshold = 10000,
           .settings =
-              {.div = CTSU_CLOCK_DIV_18, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 154, .count = 1}},
-         {.pin = 6,
-          .threshold = 10000,
-          .settings = {
-              .div = CTSU_CLOCK_DIV_16, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 282, .count = 1}}}}};
+              {.div = CTSU_CLOCK_DIV_18, .gain = CTSU_ICO_GAIN_100, .ref_current = 0, .offset = 154, .count = 1}}}}};
 
 static Submitter &submitter();
 
